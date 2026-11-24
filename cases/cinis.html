@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="CINIS 自律打卡界面设计，展示角色选择、今日任务、专注与打卡反馈。">
   <meta name="theme-color" content="#ffffff">
-  <title>CINIS 自律打卡 · 设计作品集</title>
+  <title>CINIS 自律打卡 · LIANG 作品集</title>
   <link rel="stylesheet" href="../style.css">
+  <script defer src="../interactions.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header">
     <div class="frame header-row">
-      <a class="site-name" href="../index.html">设计作品集</a>
+      <a class="site-name" href="../index.html">LIANG</a>
       <nav aria-label="主导航">
         <a href="../index.html#work" aria-current="true">作品</a>
         <a href="../about.html">关于</a>
@@ -30,7 +31,7 @@
     <section class="case-demo" aria-labelledby="flow">
       <div class="demo-heading">
         <h2 id="flow">打卡流程</h2>
-        <p>切换查看三个界面状态。</p>
+        <p>按步骤体验任务选择与打卡反馈。</p>
       </div>
       <div class="case-flow">
         <fieldset class="view-switch">
@@ -45,15 +46,27 @@
         <div class="flow-panels">
           <figure class="flow-panel" data-step="tasks">
             <img src="../assets/cinis/tasks.png" alt="今日页显示角色进度、待完成任务和已完成任务" width="437" height="953">
-            <figcaption><strong>从今日任务开始</strong><p>待办和已完成任务在同一张列表里。每项任务标注预计时长、经验值和魂火，方便在开始前了解任务要求。</p></figcaption>
+            <figcaption>
+              <strong>从今日任务开始</strong>
+              <p>待办和已完成任务在同一张列表里。每项任务标注预计时长、经验值和魂火，方便在开始前了解任务要求。</p>
+              <button class="flow-next" type="button" data-next-step="step-mode" hidden>打开任务选项</button>
+            </figcaption>
           </figure>
           <figure class="flow-panel" data-step="mode">
             <img src="../assets/cinis/mode.png" alt="任务底部弹层提供点火专注、快速打卡和取消入口" width="440" height="954">
-            <figcaption><strong>选择计时专注或快速打卡</strong><p>点开任务后，可以启动计时，也可以直接记录完成。界面明确提示快速打卡不计专注时长。</p></figcaption>
+            <figcaption>
+              <strong>选择计时专注或快速打卡</strong>
+              <p>点开任务后，可以启动计时，也可以直接记录完成。界面明确提示快速打卡不计专注时长。</p>
+              <button class="flow-next" type="button" data-next-step="step-reward" hidden>预览完成反馈</button>
+            </figcaption>
           </figure>
           <figure class="flow-panel" data-step="reward">
             <img src="../assets/cinis/reward.png" alt="打卡成功弹窗显示任务名称、时长、经验值和魂火奖励" width="438" height="954">
-            <figcaption><strong>确认本次完成结果</strong><p>成功弹窗先确认任务和时长，再显示获得的经验值和魂火。「继续」用于返回任务流程。</p></figcaption>
+            <figcaption>
+              <strong>确认本次完成结果</strong>
+              <p>成功弹窗先确认任务和时长，再显示获得的经验值和魂火。「继续」用于返回任务流程。</p>
+              <button class="flow-next" type="button" data-next-step="step-tasks" hidden>返回今日任务</button>
+            </figcaption>
           </figure>
         </div>
       </div>
