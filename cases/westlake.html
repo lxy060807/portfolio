@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="西湖空间图志是一份可交互的三维地图原型，支持地图探索、景点查看、路线聚焦与昼夜切换。">
+  <meta name="theme-color" content="#ffffff">
+  <title>西湖 · 空间图志 · 设计作品集</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header">
+    <div class="frame header-row">
+      <a class="site-name" href="../index.html">设计作品集</a>
+      <nav aria-label="主导航">
+        <a href="../index.html#work" aria-current="true">作品</a>
+        <a href="../about.html">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="frame case-page">
+    <div class="page-intro">
+      <a class="back-link" href="../index.html#work">全部作品</a>
+      <h1>西湖 · 空间图志</h1>
+      <p>一个可探索的西湖三维地图。用地图图钉、景点列表和登山路线，把湖体、周边街区与宝石山步道放在同一个空间里。</p>
+    </div>
+
+    <section class="case-demo" aria-labelledby="demo-title">
+      <div class="demo-heading">
+        <h2 id="demo-title">昼夜对照</h2>
+        <p>同一机位下比较场景的光照变化。</p>
+      </div>
+      <div class="comparison">
+        <fieldset class="view-switch">
+          <legend class="visually-hidden">选择场景光照</legend>
+          <input class="visually-hidden" type="radio" name="scene-light" id="scene-day" checked>
+          <label for="scene-day">白天</label>
+          <input class="visually-hidden" type="radio" name="scene-light" id="scene-night">
+          <label for="scene-night">夜景</label>
+        </fieldset>
+        <figure class="scene">
+          <img class="scene-day" src="../assets/westlake-day.jpg" alt="日光下的西湖三维模型，湖岸、堤道和街区清晰可见" width="1440" height="900">
+          <img class="scene-night" src="../assets/westlake-night.jpg" alt="夜间的同一西湖场景，湖岸和周边街区由灯光勾勒" width="1440" height="900">
+        </figure>
+      </div>
+    </section>
+
+    <!-- 补写真实的项目背景、本人职责、备选方案与验证结果。不要从这两个交互描述推断个人贡献。 -->
+    <section class="content-row" aria-labelledby="goal">
+      <h2 id="goal">项目目标</h2>
+      <p>在一张地图里查看湖面、景点和步道之间的空间关系，并能从整体视图快速定位到感兴趣的地点。</p>
+    </section>
+    <section class="content-row" aria-labelledby="interaction">
+      <h2 id="interaction">关键交互</h2>
+      <div class="case-details">
+        <div>
+          <h3>用地图和列表查找景点</h3>
+          <p>可以直接点击地图图钉，也可以从景点列表定位。进入地点详情后可以查看介绍和实拍照片。</p>
+        </div>
+        <div>
+          <h3>在同一张地图里对照路线</h3>
+          <p>从宝石山登山入口查看六条路线，通过地图入口或路线按钮聚焦单线。</p>
+        </div>
+      </div>
+    </section>
+    <section class="content-row" aria-labelledby="delivery">
+      <h2 id="delivery">原型与数据</h2>
+      <div class="case-details">
+        <p>项目包含可交互网页原型与可编辑 Blender 场景。地形与建筑为简化表达，夜景光照为艺术演绎。</p>
+        <p class="data-credit">空间数据来自 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap 贡献者</a>、<a href="https://docs.overturemaps.org/attribution/#buildings">Overture Maps Foundation</a> 和 <a href="https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM">Copernicus DEM</a>。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="frame site-footer">
+    <a href="../index.html#work">返回作品列表</a>
+    <a href="peacock.html">下一项 · 孔雀神记</a>
+  </footer>
+</body>
+</html>
