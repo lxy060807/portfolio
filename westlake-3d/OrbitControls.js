@@ -235,6 +235,14 @@ class OrbitControls extends Controls {
 		this.zoomSpeed = 1.0;
 
 		/**
+		 * Optional sensitivity for two-finger dollying. Defaults to zoomSpeed.
+		 *
+		 * @type {?number}
+		 * @default null
+		 */
+		this.touchZoomSpeed = null;
+
+		/**
 		 * Enable or disable horizontal and vertical rotation of the camera.
 		 *
 		 * Note that it is possible to disable a single axis by setting the min and max of the
@@ -1323,7 +1331,9 @@ class OrbitControls extends Controls {
 
 		this._dollyEnd.set( 0, distance );
 
-		this._dollyDelta.set( 0, Math.pow( this._dollyEnd.y / this._dollyStart.y, this.zoomSpeed ) );
+		// Keep near-coincident fingers from producing an extreme scale change.
+		const ratio = Math.max( this._dollyEnd.y, 12 ) / Math.max( this._dollyStart.y, 12 );
+		this._dollyDelta.set( 0, Math.pow( ratio, this.touchZoomSpeed ?? this.zoomSpeed ) );
 
 		this._dollyOut( this._dollyDelta.y );
 

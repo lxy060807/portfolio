@@ -10,12 +10,14 @@ import { createLighting } from './atlas-lighting.js';
 
 const $=s=>document.querySelector(s), stage=$('#stage'), canvas=$('#scene');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const compactLayout = matchMedia('(max-width: 760px)');
 let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true})}catch(e){$('#loader').innerHTML='<strong>当前浏览器无法启动三维视图</strong><p>请启用硬件加速，或换用支持 WebGL 的浏览器。</p><a href="westlake.blend" download>下载 Blender 模型</a>';throw e}
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#eef2ef');renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(39,1,.008,80);camera.position.set(5.7,6.8,8.3);
 const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.075;controls.minDistance=.3;controls.maxDistance=19;controls.maxPolarAngle=Math.PI*.46;controls.screenSpacePanning=true;controls.target.set(-.12,.05,.2);controls.autoRotateSpeed=.38;controls.listenToKeyEvents(canvas);
+controls.touchZoomSpeed = .68;
 const hemisphere = new THREE.HemisphereLight(0xf4fbff,0x718467,2.5);scene.add(hemisphere);
 const sun=new THREE.DirectionalLight(0xfff6df,3.1);sun.position.set(-4,8,4);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-5,right:5,top:5,bottom:-5,near:.1,far:25});sun.shadow.bias=-.00016;sun.shadow.normalBias=.012;scene.add(sun);
 const fill=new THREE.DirectionalLight(0xd5e6f2,1);fill.position.set(5,4,-5);scene.add(fill);
@@ -88,7 +90,7 @@ function showTrail(id, trigger) {
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const x = (minX + maxX) / 2, z = (minZ + maxZ) / 2;
   const focus = new THREE.Vector3(x, terrainAt(x, z), z);
-  const mobile = matchMedia('(max-width: 760px)').matches;
+  const mobile = compactLayout.matches;
   const viewSpan = Math.max(maxX - minX, maxZ - minZ);
   const fit = mobile ? 1.95 : current ? 1.73 : 2.00;
   const routeView = new THREE.Vector3(.12, .89, .48).normalize().multiplyScalar(Math.max(.58, viewSpan * fit));
@@ -126,7 +128,7 @@ function flyToPlace(i) {
       setPerspective();
       return;
     }
-    const mobile = matchMedia('(max-width: 760px)').matches;
+    const mobile = compactLayout.matches;
     const direction = view?.direction ?? new THREE.Vector3(.36, .71, .75);
     const visibleHeight = $('#atlas-details').offsetTop - 64;
     const panelFit = view?.place === 'moon' && visibleHeight > 0 ? Math.max(1, 104 / visibleHeight) : 1;
@@ -356,7 +358,7 @@ function resize() {
 function fitTowerGroup(target, towers) {
   const {clientWidth: width, clientHeight: height} = stage;
   const details = $('#atlas-details');
-  const mobile = matchMedia('(max-width: 760px)').matches;
+  const mobile = compactLayout.matches;
   const abovePanel = { left: 16, right: width - (mobile ? 64 : 20), top: 65, bottom: details.offsetTop - 8 };
   const besidePanel = { left: 34, right: details.offsetLeft - 18, top: 85, bottom: height - 50 };
   const focalLength = height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
@@ -408,7 +410,7 @@ function updateInspectionFraming() {
   const {clientWidth: width, clientHeight: height} = stage;
   if (!width || !height) return;
   const showDetails = !$('#atlas-details').hidden;
-  if (showDetails && matchMedia('(max-width: 760px)').matches) {
+  if (showDetails && compactLayout.matches) {
     const placeTop = $('#atlas-details').offsetTop;
     const detailOffset = .5 - (placeTop + 64) / (2 * height);
     const offset = groups.HikingTrail.visible ? (activeTrail ? .19 : .12) : waterfrontFocus ? detailOffset : .20;
@@ -518,7 +520,9 @@ $('#reset').onclick=()=>setActive(0);
 $('#view-perspective').onclick=()=>flyToPlace(selected);
 $('#view-top').onclick=()=>{const target=controls.target.clone(),d=Math.max(controls.getDistance(),waterfrontFocus ? .009 : .5);fly(target.clone().add(new THREE.Vector3(0,d,.0001)),target);$('#view-perspective').classList.remove('active');$('#view-perspective').setAttribute('aria-pressed','false');$('#view-top').classList.add('active');$('#view-top').setAttribute('aria-pressed','true')};
 $('#north').onclick=()=>{const t=controls.target.clone(),d=controls.getDistance(),a=controls.getPolarAngle();fly(t.clone().add(new THREE.Vector3(0,Math.cos(a)*d,Math.sin(a)*d)),t)};
-function zoom(f){const target=controls.target.clone(),dir=camera.position.clone().sub(target);dir.setLength(THREE.MathUtils.clamp(dir.length()*f,controls.minDistance,controls.maxDistance));fly(target.clone().add(dir),target)}$('#zoom-in').onclick=()=>zoom(.75);$('#zoom-out').onclick=()=>zoom(1.3);
+function zoom(f){const target=controls.target.clone(),dir=camera.position.clone().sub(target);dir.setLength(THREE.MathUtils.clamp(dir.length()*f,controls.minDistance,controls.maxDistance));fly(target.clone().add(dir),target)}
+$('#zoom-in').onclick = () => zoom(compactLayout.matches ? .84 : .75);
+$('#zoom-out').onclick = () => zoom(compactLayout.matches ? 1 / .84 : 1.3);
 $('#rotate').onclick=()=>{flight=null;controls.autoRotate=!controls.autoRotate;$('#rotate').setAttribute('aria-pressed',String(controls.autoRotate))};
 $('#capture').onclick=()=>{renderer.render(scene,camera);const a=document.createElement('a');a.download='西湖空间图志.png';a.href=canvas.toDataURL('image/png');a.click()};
 for(const [id,names]of[['buildings',['Buildings','Landmarks']],['trees',['Trees']],['roads',['Roads']]])$('#layer-'+id).onchange=e=>names.forEach(n=>groups[n].visible=e.target.checked);
@@ -541,6 +545,16 @@ document.addEventListener('keydown', event => {
   layerButton.focus();
 });
 $('#about-open').onclick=()=>$('#about').showModal();$('#about-close').onclick=()=>$('#about').close();$('#about').addEventListener('click',e=>{if(e.target===$('#about')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close()}});
+const modelDownloads = $('.downloads');
+if (modelDownloads) {
+  const sidebar = modelDownloads.parentElement;
+  function placeDownloads() {
+    const destination = compactLayout.matches ? $('#about-downloads') : sidebar;
+    if (modelDownloads.parentElement !== destination) destination.append(modelDownloads);
+  }
+  placeDownloads();
+  compactLayout.addEventListener('change', placeDownloads);
+}
 window.exportGLB=async()=>{const {GLTFExporter}=await import('./GLTFExporter.js');const visible=Object.values(groups).map(g=>g.visible);Object.values(groups).forEach(g=>g.visible=true);try{const buffer=await new GLTFExporter().parseAsync(model,{binary:true,onlyVisible:false});const bytes=new Uint8Array(buffer);let str='';for(let i=0;i<bytes.length;i+=32768)str+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(str)}finally{Object.values(groups).forEach((g,i)=>g.visible=visible[i])}};
 window.__sceneDiagnostics=()=>({ready:loaded,geometries:renderer.info.memory.geometries,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),groups:Object.fromEntries(Object.entries(groups).map(([k,g])=>[k,g.visible]))});
 start();

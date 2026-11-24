@@ -151,7 +151,7 @@
   .atlas-details[data-mode="place"] {
     --gallery-edge: 12px;
     width: auto;
-    max-height: min(57%, 366px);
+    max-height: min(54%, 420px);
     animation-name: place-enter-bottom;
   }
   .place-heading { padding: 11px 54px 9px var(--gallery-edge); }
@@ -160,12 +160,12 @@
   .atlas-details[data-mode="place"] .atlas-close { top: 7px; right: 8px; width: 44px; height: 44px; }
   .gallery-open { height: clamp(85px, 16vh, 150px); }
   .gallery-control { width: 44px; height: 44px; }
-  .gallery-expand { top: 5px; right: 5px; width: auto; }
+  .gallery-expand { top: 5px; right: 5px; width: auto; font-size: .8125rem; }
   .gallery-next, .gallery-previous { top: auto; bottom: 5px; transform: none; }
   .gallery-next { right: 5px; }
   .gallery-previous { left: 5px; }
   .gallery-count { right: 56px; bottom: 6px; }
-  #place-caption { min-height: 25px; }
+  #place-caption { min-height: 30px; font-size: .875rem; }
   .gallery-thumbnail { height: 44px; }
   .atlas-lightbox.pswp--touch .pswp__button--arrow {
     visibility: visible;
