@@ -18,15 +18,83 @@ function onHorizontalSwipe(surface, move) {
   surface.addEventListener("pointercancel", () => { start = undefined; });
 }
 
-function enableShowcaseSwipe() {
-  const stage = document.querySelector(".showcase-scenes");
-  if (!stage) return;
+function enableShowcaseReel() {
+  const art = document.querySelector(".showcase-art");
+  if (!art) return;
   const selections = [...document.querySelectorAll('input[name="showcase"]')];
-  onHorizontalSwipe(stage, (direction) => {
-    const active = selections.findIndex((input) => input.checked);
-    const next = selections[active + direction];
-    if (next) next.checked = true;
+  const discs = [...art.querySelectorAll("[data-showcase-disc]")];
+  let gesture;
+  let suppressClick = false;
+
+  function select(input) {
+    if (!input || input.checked) return;
+    input.checked = true;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  art.addEventListener("dragstart", (event) => event.preventDefault());
+  art.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    suppressClick = false;
+    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
   });
+  art.addEventListener("pointermove", (event) => {
+    if (!gesture || event.pointerId !== gesture.id) return;
+    const dx = event.clientX - gesture.x;
+    const dy = event.clientY - gesture.y;
+    if (!gesture.moved && (Math.abs(dx) < 9 || Math.abs(dx) < Math.abs(dy) * 1.35)) return;
+    if (!gesture.moved) {
+      gesture.moved = true;
+      art.classList.add("is-scrubbing");
+      art.setPointerCapture(event.pointerId);
+    }
+    if (reducedMotion.matches) return;
+    const drag = Math.max(-110, Math.min(110, dx * .55));
+    art.style.setProperty("--reel-drag", `${drag}px`);
+    art.style.setProperty("--reel-turn", `${drag * -.37}deg`);
+  });
+
+  function finishGesture(event) {
+    if (!gesture || event.pointerId !== gesture.id) return;
+    const dx = event.clientX - gesture.x;
+    suppressClick = gesture.moved;
+    gesture = undefined;
+    art.classList.remove("is-scrubbing");
+    art.style.removeProperty("--reel-drag");
+    art.style.removeProperty("--reel-turn");
+    if (event.type !== "pointerup" || !suppressClick || Math.abs(dx) < 48) return;
+    const current = selections.findIndex((input) => input.checked);
+    select(selections[current + (dx < 0 ? 1 : -1)]);
+  }
+
+  art.addEventListener("pointerup", finishGesture);
+  art.addEventListener("pointercancel", finishGesture);
+  art.addEventListener("lostpointercapture", (event) => {
+    if (event.target === art) finishGesture(event);
+  });
+  art.addEventListener("click", (event) => {
+    if (suppressClick && event.detail > 0) {
+      event.preventDefault();
+      suppressClick = false;
+      return;
+    }
+    const disc = event.target.closest("[data-showcase-disc]");
+    if (!disc || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const input = selections.find((item) => item.id === disc.dataset.showcaseDisc);
+    if (input.checked) return;
+    event.preventDefault();
+    select(input);
+  });
+
+  function updateDiscNames() {
+    for (const [index, disc] of discs.entries()) {
+      const input = selections[index];
+      const title = input.labels[0].textContent;
+      disc.setAttribute("aria-label", input.checked ? `打开「${title}」案例` : `切换到「${title}」`);
+    }
+  }
+  document.querySelector(".showcase-controls").addEventListener("change", updateDiscNames);
+  updateDiscNames();
 }
 
 function enableProjectRail() {
@@ -307,7 +375,7 @@ function enableImageViewer() {
   onHorizontalSwipe(stage, moveViewer);
 }
 
-enableShowcaseSwipe();
+enableShowcaseReel();
 enableProjectRail();
 revealProjects();
 enableFlowButtons();

@@ -1,8 +1,8 @@
 let selectedProject;
 
 function findProjectCover(link) {
-  return link.querySelector(".project-media") ??
-    link.closest(".showcase-scene")?.querySelector(".showcase-art");
+  if (link.matches(".project-card")) return link.querySelector(".project-media");
+  return [...document.querySelectorAll(".showcase-disc")].find((disc) => disc.href === link.href);
 }
 
 function shareProjectCover(cover, transition) {
@@ -13,7 +13,7 @@ function shareProjectCover(cover, transition) {
 
 document.addEventListener("click", (event) => {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-  selectedProject = event.target.closest(".project-card, .showcase-action");
+  selectedProject = event.target.closest(".project-card, .showcase-action, .showcase-disc");
 });
 
 window.addEventListener("pageswap", (event) => {
