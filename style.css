@@ -134,10 +134,10 @@ nav a[aria-current] {
 
 .home-intro {
   display: grid;
-  grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 2.05fr) minmax(0, 1fr);
+  align-items: end;
   gap: clamp(1.5rem, 4vw, 4.5rem);
-  padding-block: clamp(3rem, 6vw, 6rem) clamp(3rem, 7vw, 7rem);
+  padding-block: clamp(2.9rem, 6vw, 5.75rem) clamp(2.5rem, 6vw, 5.75rem);
 }
 
 h1 {
@@ -171,7 +171,7 @@ h1 {
 
 .home-summary {
   max-width: 21em;
-  margin-block-start: clamp(1.1rem, 3vw, 2.5rem);
+  padding-block-end: .4rem;
   font-size: clamp(1rem, 1.45vw, 1.14rem);
 }
 
@@ -196,7 +196,7 @@ h1 {
 
 .hero-action:hover { background: var(--paper); color: var(--accent); }
 
-.hero-action::after, .hero-preview-link::after, .project-link::after {
+.hero-action::after, .project-link::after {
   width: .44rem;
   height: .44rem;
   border: solid currentColor;
@@ -206,40 +206,6 @@ h1 {
 }
 
 .hero-action::after { transform: rotate(45deg); }
-
-.hero-preview { display: block; text-decoration: none; }
-
-.hero-image {
-  overflow: hidden;
-  aspect-ratio: 1.43;
-  background: var(--dark);
-}
-
-.hero-image img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: scale 650ms var(--ease-out);
-}
-
-.hero-preview-caption {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .65rem;
-  padding-block: .72rem;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: .875rem;
-}
-
-.hero-preview-link {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  color: var(--accent);
-}
 
 .text-link {
   display: inline-flex;
@@ -292,7 +258,6 @@ h1 {
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .hero-preview:hover img { scale: 1.035; }
   .project-card:hover img { transform: scale(1.035); }
   .project-card:hover .project-link { transform: translateX(4px); }
   .project-card-feature:hover .feature-screens img:first-child { transform: translateY(-6px); }
@@ -820,16 +785,10 @@ h1 {
   }
 
   .home-summary { animation-delay: 160ms; }
-  .hero-image { animation: cover-enter 720ms var(--ease-out) 80ms both; }
   .project-entered { animation: project-enter 520ms var(--ease-out) both; }
 
   @keyframes headline-rise {
     from { transform: translateY(104%); }
-  }
-
-  @keyframes cover-enter {
-    from { clip-path: inset(0 0 12% 0); opacity: .4; }
-    to { clip-path: inset(0); opacity: 1; }
   }
 
   @keyframes intro-enter {
@@ -844,18 +803,7 @@ h1 {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .hero-image {
-      view-timeline-name: --cover;
-      view-timeline-axis: block;
-    }
-
-    .hero-image img {
-      animation: cover-drift linear both;
-      animation-timeline: --cover;
-      animation-range: exit 0% exit 95%;
-    }
-
+  @supports (animation-timeline: scroll()) {
     body:has(.case-page)::before {
       position: fixed;
       z-index: 3;
@@ -867,11 +815,6 @@ h1 {
       animation-timeline: scroll(root block);
       pointer-events: none;
       content: "";
-    }
-
-    @keyframes cover-drift {
-      from { transform: scale(1.07); }
-      to { transform: translateY(3.2%) scale(1.07); }
     }
 
     @keyframes reading-progress {
@@ -895,7 +838,6 @@ h1 {
 
   .home-intro { gap: 1.85rem; }
   .home-intro h1 { font-size: clamp(2.8rem, 10vw, 4.6rem); }
-  .hero-image { aspect-ratio: 1.48; }
 
   .home-summary { max-width: 24em; }
 
@@ -919,5 +861,5 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   :root { scroll-behavior: auto; }
-  .project-media img, .scene img, .hero-image img, .image-viewer { transition: none; }
+  .project-media img, .scene img, .image-viewer { transition: none; }
 }
