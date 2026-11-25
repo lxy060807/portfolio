@@ -61,7 +61,7 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
   for (const [index, place] of places.entries()) {
     if (!index) continue;
     const dining = place.dining;
-    const region = dining ? '西湖周边餐厅' : place.region ?? '湖面、堤岛与宝石山';
+    const region = place.region ?? '湖面、堤岛与宝石山';
     if (!sections.has(region)) {
       const section = document.createElement('section');
       const title = document.createElement('h3');
