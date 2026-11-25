@@ -34,7 +34,7 @@ function enableSceneComparison() {
   function updateSplit() {
     const day = slider.valueAsNumber;
     scene.style.setProperty("--split", `${day}%`);
-    slider.setAttribute("aria-valuetext", `白天 ${day}%，夜景 ${100 - day}%`);
+    slider.setAttribute("aria-valuetext", `白天占 ${day}%，夜景占 ${100 - day}%`);
   }
 
   function dragSplit(event) {
@@ -100,7 +100,7 @@ function enableImageViewer() {
     const figureCaption = image.closest("figure")?.querySelector("figcaption")?.textContent.trim();
     preview.src = image.currentSrc || image.src;
     preview.alt = image.alt;
-    caption.textContent = `${activeIndex + 1} / ${images.length} · ${figureCaption || image.alt}`;
+    caption.textContent = `第 ${activeIndex + 1} 张（共 ${images.length} 张）：${figureCaption || image.alt}`;
     controls.hidden = images.length < 2;
 
     if (direction && !reducedMotion.matches && typeof preview.animate === "function") {
