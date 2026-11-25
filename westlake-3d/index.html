@@ -92,6 +92,7 @@
   <article id="trip-panel" class="atlas-content" hidden>
     <h2 id="trip-title" tabindex="-1">景点路线规划</h2>
     <form id="trip-form">
+      <button id="trip-map-open" type="button">在地图上选</button>
       <div class="trip-stops">
         <label class="trip-stop-field"><span>起点</span><select name="start" required><option value="">选起点</option></select></label>
         <ol id="trip-waypoints" aria-label="途经点" hidden></ol>
@@ -108,6 +109,15 @@
       </fieldset>
       <button type="submit" id="trip-plan">规划路线</button>
     </form>
+    <div id="trip-map-picker" hidden>
+      <div class="trip-map-roles" role="group" aria-label="选择站点类型">
+        <button type="button" data-trip-role="start" aria-pressed="false">起点</button>
+        <button type="button" data-trip-role="via" aria-pressed="false">途经点</button>
+        <button type="button" data-trip-role="finish" aria-pressed="false">终点</button>
+        <button type="button" id="trip-map-done">完成</button>
+      </div>
+      <p id="trip-map-hint" role="status"></p>
+    </div>
     <p id="trip-status" class="atlas-copy" role="status" aria-live="polite"></p>
     <div id="trip-result" hidden>
       <p id="trip-endpoints"></p>

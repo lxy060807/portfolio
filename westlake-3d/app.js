@@ -8,6 +8,7 @@ import { createBuildingLayer, createTrailLayer, createTrailOverview } from './at
 import { buildCauseways, buildStoneLanterns, causewayWays, layoutCauseways } from './atlas-waterfront.js';
 import { createLighting } from './atlas-lighting.js';
 import { createTripPlanner, tripColors } from './atlas-trip-ui.js';
+import { tripStops } from './atlas-trip-network.js';
 
 const $=s=>document.querySelector(s), stage=$('#stage'), canvas=$('#scene');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -50,7 +51,22 @@ let tripBounds = null, tripPins = [];
 const atlasUI = createAtlasUI({
   onPlace: setActive, onTrail: showTrail, onClose: closeDetails, onDetail: focusWaterfront, onTrip: openTrip
 });
-const tripPlanner = createTripPlanner(places, () => loadData('trip-network.json'), drawTrip, fitTrip);
+const tripPlanner = createTripPlanner(places, () => loadData('trip-network.json'), drawTrip, fitTrip, showMapStops);
+
+function showMapStops(picking, points) {
+  stage.toggleAttribute('data-trip-picking', picking);
+  const marks = new Map();
+  for (const {stop, mark} of points) {
+    if (!marks.has(stop.id)) marks.set(stop.id, []);
+    marks.get(stop.id).push(mark);
+  }
+  for (const {el, tripStop} of labels) {
+    if (!tripStop) continue;
+    const mark = marks.get(tripStop.id)?.join('·') ?? '';
+    el.dataset.mark = mark;
+    el.setAttribute('aria-label', mark ? tripStop.name + '，已选 ' + mark : tripStop.name);
+  }
+}
 
 function setActive(index, trigger) {
   tripPlanner.close();
@@ -121,7 +137,7 @@ function openTrip(trigger, destination) {
   updateInspectionFraming();
 }
 
-function drawTrip(result) {
+function drawTrip(result, draft = []) {
   tripLayer.traverse(item => {
     item.geometry?.dispose();
     item.material?.dispose();
@@ -131,8 +147,18 @@ function drawTrip(result) {
   tripPins = [];
   tripBounds = null;
   delete stage.dataset.trip;
-  if (!result?.legs.length) return;
-  tripBounds = { left:Infinity, right:-Infinity, top:Infinity, bottom:-Infinity };
+  if (!result) {
+    if (!stage.hasAttribute('data-trip-picking')) {
+      const mapStops = new Map();
+      for (const {stop, mark} of draft) {
+        if (!mapStops.has(stop.id)) mapStops.set(stop.id, {coordinates:stop.c,names:[stop.name],labels:[]});
+        mapStops.get(stop.id).labels.push(mark);
+      }
+      addTripPins(mapStops);
+    }
+    return;
+  }
+  if (result.legs.length) tripBounds = { left:Infinity, right:-Infinity, top:Infinity, bottom:-Infinity };
   for (const leg of new Set(result.legs)) {
     const {group, points} = createTrailLayer(
       { id:leg.mode, color:tripColors[leg.mode], legs:[leg] }, project, terrainAt, { outline:.043, line:.027 }
@@ -152,6 +178,12 @@ function drawTrip(result) {
     marker.names.push(point.stop.name);
     marker.labels.push(i === 0 ? '起' : i === result.routePoints.length - 1 ? '终' : String(i));
   }
+  addTripPins(mapStops);
+  stage.dataset.trip = 'active';
+  fitTrip();
+}
+
+function addTripPins(mapStops) {
   for (const {coordinates,names,labels:marks} of mapStops.values()) {
     const element = document.createElement('span');
     element.className = 'map-label trip-pin';
@@ -161,8 +193,6 @@ function drawTrip(result) {
     tripPins.push({ element, position:new THREE.Vector3(x,terrainAt(x,z) + .02,z) });
     $('#labels').append(element);
   }
-  stage.dataset.trip = 'active';
-  fitTrip();
 }
 
 function tripFrame() {
@@ -394,6 +424,18 @@ function build(d, footprintData){
    const place = places[i], [x,z] = project(place.c);
    addMarker(place.name, x, z, place.markerHeight ?? .025, i);
  }
+ for (const stop of tripStops(places)) {
+   const [x,z] = project(stop.c);
+   const el = document.createElement('button');
+   el.type = 'button';
+   el.className = 'map-label trip-choice';
+   el.dataset.tripStop = stop.id;
+   el.textContent = stop.name;
+   el.hidden = true;
+   el.addEventListener('click', () => tripPlanner.pick(stop.id));
+   $('#labels').append(el);
+   labels.push({el, position:new THREE.Vector3(x, Math.max(.03,terrainAt(x,z)) + .025,z), i:-1, tripStop:stop});
+ }
  for (const [place, views] of waterfrontViews) {
    if (place === 'duanqiao') continue;
    for (const view of views.filter(view => view.id !== 'all')) addWaterfrontMarker(view, place);
@@ -557,7 +599,8 @@ function updateLabels() {
   const width = stage.clientWidth, height = stage.clientHeight;
   const trailVisible = groups.HikingTrail.visible;
   const night = document.documentElement.dataset.lighting === 'night';
-  const obstacleRects = night && trailVisible ? routeObstacles.map(element => element.getBoundingClientRect()) : [];
+  const picking = stage.hasAttribute('data-trip-picking');
+  const obstacleRects = picking || (night && trailVisible) ? routeObstacles.map(element => element.getBoundingClientRect()) : [];
   const stageRect = obstacleRects.length ? stage.getBoundingClientRect() : null;
   const detailPanel = $('#atlas-details');
   const detail = detailPanel.hidden ? null : {
@@ -566,11 +609,12 @@ function updateLabels() {
     bottom: detailPanel.offsetTop + detailPanel.offsetHeight
   };
   const positions = [];
-  const priority = label => label.waterfront ? 6 : label.routeId
+  const priority = label => label.tripStop ? (label.el.dataset.mark ? 8 : 7) : label.waterfront ? 6 : label.routeId
     ? (label.routeId === activeTrail ? 4 : label.reference ? 2 : 3)
     : label.i === selected ? 5 : places[label.i]?.region ? .8 : 1;
   const ordered = labels.slice().sort((a, b) => priority(b) - priority(a));
   for (const label of ordered) {
+    if (picking !== Boolean(label.tripStop)) { label.el.hidden = true; continue; }
     const place = places[selected]?.id;
     const showWaterfront = label.waterfront && detail && place === label.place && (
       place === 'moon' ? groups.Landmarks.visible && waterfrontFocus?.id === 'all' : groups.Roads.visible && !waterfrontFocus);
@@ -578,27 +622,28 @@ function updateLabels() {
     const placeLayerVisible = !expanded || label.i === selected || (!trailVisible && !waterfrontFocus);
     const showPlace = label.i >= 0 && placeLayerVisible && !(label.i === selected && waterfrontFocus) && !(
       place === 'baidi' && places[label.i].id === 'duanqiao');
-    if (!showWaterfront && !showPlace && !(label.routeId && trailVisible)) { label.el.hidden = true; continue; }
+    if (!label.tripStop && !showWaterfront && !showPlace && !(label.routeId && trailVisible)) { label.el.hidden = true; continue; }
     proj.copy(label.position).project(camera);
     const x = (proj.x * .5 + .5) * width, anchorY = (-proj.y * .5 + .5) * height;
     let y = anchorY - (label.waterfront && label.place === 'moon' ? 8 : 0);
-    const expandedClearance = label.routeId && night
+    const expandedClearance = label.tripStop ? Math.ceil(label.el.textContent.length * 6.5 + 20)
+      : label.routeId && night
       ? 18 + label.el.textContent.length * 7
       : 16 + label.el.textContent.length * 6.5;
     const fits = (clearance, top) => {
       const overlapsPanel = detail && x + clearance > detail.left && x - clearance < detail.right
         && top > detail.top && top - 32 < detail.bottom;
-      const overlapsControls = label.routeId && obstacleRects.some(rect => (
+      const overlapsControls = (label.routeId || label.tripStop) && obstacleRects.some(rect => (
         x + stageRect.left + clearance > rect.left && x + stageRect.left - clearance < rect.right
-        && top + stageRect.top > rect.top && top + stageRect.top - 30 < rect.bottom
+        && top + stageRect.top > rect.top && top + stageRect.top - (picking ? 44 : 30) < rect.bottom
       ));
-      const overlapsLabel = positions.some(p => Math.abs(p.x - x) < p.clearance + clearance && Math.abs(p.y - top) < 26);
+      const overlapsLabel = positions.some(p => Math.abs(p.x - x) < p.clearance + clearance && Math.abs(p.y - top) < (picking ? 45 : 26));
       return top > 75 && top < height - 35 && x > clearance && x < width - clearance
         && !overlapsPanel && !overlapsControls && !overlapsLabel;
     };
-    const asDot = (label.routeId || (expanded && label.i !== selected)) && !fits(expandedClearance, y);
-    const clearance = asDot ? 13 : expandedClearance;
-    if (label.routeId && asDot && !fits(clearance, y)) {
+    const asDot = (label.routeId || label.tripStop || (expanded && label.i !== selected)) && !fits(expandedClearance, y);
+    const clearance = asDot ? (picking ? 22 : 13) : expandedClearance;
+    if ((label.routeId || label.tripStop) && asDot && !fits(clearance, y)) {
       for (const offset of [16, 32, 48, 64]) {
         if (fits(clearance, anchorY - offset)) {
           y = anchorY - offset;
@@ -609,6 +654,10 @@ function updateLabels() {
     const visible = proj.z < 1 && proj.z > -1 && fits(clearance, y);
     label.el.hidden = !visible;
     if (!visible) continue;
+    if (label.tripStop) {
+      label.el.classList.toggle('trip-choice-dot', Boolean(asDot));
+      label.el.style.setProperty('--leader', (16 + anchorY - y) + 'px');
+    }
     if (expanded) label.el.classList.toggle('place-dot', Boolean(asDot));
     if (label.routeId) {
       label.el.classList.toggle('route-dot', Boolean(asDot));

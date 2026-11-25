@@ -352,6 +352,21 @@
 .atlas-details[data-mode="trip"] { width:min(390px,calc(100% - 112px)); }
 #trip-panel { --trip-text:#254e40; --trip-input:#f4f7f0; --trip-active:#dbe8de; color:var(--trip-text); }
 #trip-form { display:grid; gap:10px; }
+#trip-map-open, .trip-map-roles button { min-height:44px; padding:5px 9px; border:1px solid var(--line); border-radius:7px; background:var(--trip-input); color:var(--trip-text); }
+#trip-map-open { text-align:left; font-weight:600; }
+.trip-map-roles { display:grid; grid-template-columns:1fr 1.25fr 1fr 1fr; gap:5px; }
+.trip-map-roles button[aria-pressed="true"], #trip-map-done { background:#245b4d; color:#fff; }
+#trip-map-hint { font-size:.875rem; line-height:1.4; margin:8px 0 0; }
+.trip-picking .atlas-close-bar, .trip-picking #trip-title, .trip-picking .trip-note, .trip-picking .trip-sources { display:none; }
+#stage[data-trip-picking] #labels { visibility:visible !important; }
+#stage .trip-choice { min-height:44px; min-width:44px; border:1px solid #8ca697; }
+.trip-choice::after { height:var(--leader, 16px); bottom:calc(0px - var(--leader, 16px)); }
+.trip-choice[data-mark]:not([data-mark=""]) { background:#245b4d; color:#fff; }
+.trip-choice::before { content:attr(data-mark); font-weight:700; margin-right:.35em; }
+.trip-choice[data-mark=""]::before { margin:0; }
+#stage .trip-choice-dot { width:44px; font-size:0; padding:0; border-radius:50%; }
+.trip-choice-dot::before { content:"•"; font-size:18px; }
+.trip-choice-dot[data-mark]:not([data-mark=""])::before { content:attr(data-mark); font-size:12px; margin:0; }
 .trip-stops, #trip-waypoints { display:grid; gap:7px; }
 #trip-waypoints, .trip-segment-legs { padding:0; margin:0; list-style:none; }
 .trip-stop-field { display:grid; grid-template-columns:4.25rem minmax(0,1fr); align-items:center; gap:6px; min-width:0; font-size:13px; font-weight:600; }

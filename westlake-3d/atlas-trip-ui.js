@@ -4,7 +4,7 @@ export const tripColors = { walk: '#0b796c', bike: '#aa491f' };
 const modeNames = { walk: '步行', bike: '骑行' };
 const amount = distance => distance >= 1000 ? (distance / 1000).toFixed(1) + ' 公里' : Math.round(distance) + ' 米';
 
-export function createTripPlanner(places, loadNetwork, draw, fit) {
+export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) {
   const form = document.querySelector('#trip-form');
   const start = form.elements.start, finish = form.elements.finish;
   const status = document.querySelector('#trip-status');
@@ -14,13 +14,18 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
   const fitButton = document.querySelector('#trip-fit');
   const waypoints = document.querySelector('#trip-waypoints');
   const addWaypointButton = document.querySelector('#trip-add');
+  const picker = document.querySelector('#trip-map-picker');
+  const mapButton = document.querySelector('#trip-map-open');
+  const mapHint = document.querySelector('#trip-map-hint');
+  const roleButtons = [...picker.querySelectorAll('[data-trip-role]')];
+  const roleNames = { start:'起点', via:'途经点', finish:'终点' };
   const stops = new Map(tripStops(places).map(place => [place.id, place]));
   function addStopOptions(select) {
     for (const stop of stops.values()) select.add(new Option(stop.name + (stop.water ? '（湖中）' : ''), stop.id));
   }
   addStopOptions(start);
   addStopOptions(finish);
-  let network, request = 0;
+  let network, request = 0, pickRole = null;
 
   function updateWaypoints() {
     const rows = Array.from(waypoints.children);
@@ -35,7 +40,7 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
     }
   }
 
-  function addWaypoint() {
+  function addWaypoint(value = '') {
     const row = document.createElement('li');
     const label = document.createElement('label');
     label.className = 'trip-stop-field';
@@ -55,10 +60,16 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
     }
     row.append(label,tools);
     waypoints.append(row);
-    reset();
+    field.value = value;
     updateWaypoints();
-    field.focus();
+    return field;
   }
+
+  addWaypointButton.addEventListener('click', () => {
+    const field = addWaypoint();
+    reset();
+    field.focus();
+  });
 
   waypoints.addEventListener('click', event => {
     const button = event.target.closest('button[data-action]');
@@ -78,19 +89,45 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
     updateWaypoints();
     focus.focus();
   });
-  addWaypointButton.addEventListener('click', addWaypoint);
-
   function itineraryFields() {
     return [start, ...waypoints.querySelectorAll('select'), finish];
   }
 
-  function reset() {
+  function draftPoints() {
+    const fields = itineraryFields();
+    return fields.flatMap((field, index) => {
+      const stop = stops.get(field.value);
+      return stop ? [{ stop, mark:field === start ? '起' : field === finish ? '终' : String(index) }] : [];
+    });
+  }
+
+  function reset(showDraft = true) {
     request++;
-    form.hidden = false;
+    form.hidden = Boolean(pickRole);
     details.hidden = true;
     status.textContent = '';
-    draw(null);
+    draw(null, showDraft ? draftPoints() : []);
   }
+
+  function setPickRole(role, chosen = '') {
+    pickRole = role;
+    picker.hidden = !role;
+    picker.closest('#atlas-details').classList.toggle('trip-picking', Boolean(role));
+    for (const button of roleButtons) button.setAttribute('aria-pressed', String(button.dataset.tripRole === role));
+    mapHint.textContent = role ? chosen + '点击地图上的景点选择' + roleNames[role] + '。' : '';
+    showMapStops(Boolean(role), draftPoints());
+    reset();
+  }
+
+  mapButton.addEventListener('click', () => {
+    setPickRole(!start.value ? 'start' : !finish.value ? 'finish' : 'via');
+    roleButtons.find(button => button.dataset.tripRole === pickRole).focus();
+  });
+  for (const button of roleButtons) button.addEventListener('click', () => setPickRole(button.dataset.tripRole));
+  document.querySelector('#trip-map-done').addEventListener('click', () => {
+    setPickRole(null);
+    mapButton.focus({preventScroll:true});
+  });
 
   function formatLeg(leg, index, count) {
     const li = document.createElement('li');
@@ -184,7 +221,7 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
     summary.focus({preventScroll:true});
   }
 
-  form.addEventListener('change', reset);
+  form.addEventListener('change', () => reset());
   document.querySelector('#trip-swap').addEventListener('click', () => {
     const fields = itineraryFields(), values = fields.map(field=>field.value).reverse();
     fields.forEach((field,i)=>{field.value = values[i];});
@@ -220,9 +257,29 @@ export function createTripPlanner(places, loadNetwork, draw, fit) {
   });
   return {
     open(place) {
-      reset();
       if (stops.has(place)) finish.value = place;
+      reset();
     },
-    close: reset,
+    close() {
+      if (pickRole) setPickRole(null);
+      reset(false);
+    },
+    pick(place) {
+      if (!pickRole || !stops.has(place)) return;
+      const stop = stops.get(place);
+      if (stop.water) {
+        mapHint.textContent = stop.name + '位于湖中，需要乘船。请选择可步行或骑行到达的景点。';
+        return;
+      }
+      const role = pickRole;
+      if (role === 'via') {
+        const empty = [...waypoints.querySelectorAll('select')].find(field => !field.value);
+        if (empty) empty.value = place;
+        else addWaypoint(place);
+      } else {
+        (role === 'start' ? start : finish).value = place;
+      }
+      setPickRole(role === 'start' ? 'via' : role, '已选' + roleNames[role] + '「' + stop.name + '」。');
+    },
   };
 }
