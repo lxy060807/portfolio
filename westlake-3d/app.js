@@ -7,6 +7,7 @@ import { createAtlasUI } from './atlas-ui.js';
 import { createBuildingLayer, createTrailLayer, createTrailOverview } from './atlas-geometry.js';
 import { buildCauseways, buildStoneLanterns, causewayWays, layoutCauseways } from './atlas-waterfront.js';
 import { createLighting } from './atlas-lighting.js';
+import { createTripPlanner, tripColors } from './atlas-trip-ui.js';
 
 const $=s=>document.querySelector(s), stage=$('#stage'), canvas=$('#scene');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -27,6 +28,8 @@ const groups={};for(const name of ['Terrain','Water','Roads','Buildings','Landma
 groups.HikingTrail.visible = false;
 const trailSelectionLayer = new THREE.Group();
 scene.add(trailSelectionLayer);
+const tripLayer = new THREE.Group();
+scene.add(tripLayer);
 const mat=(name,color,extra={})=>{const m=new THREE.MeshStandardMaterial({color,roughness:.85,...extra});m.name=name;return m};
 const materials={earth:mat('Terrain_Green',0xffffff,{vertexColors:true}),water:mat('Lake_Jade',0x589f91,{roughness:.3,metalness:.12}),stone:mat('Shore_PaleStone',0xcbd1b5),road:mat('Paths_Limestone',0xe6ddc1),city:mat('Buildings_Porcelain',0xe9e7d9),roof:mat('Roof_CharcoalJade',0x44594d),wood:mat('Timber_Warm',0x947354),gold:mat('Pagoda_Bronze',0x9c8050,{metalness:.25,roughness:.52}),base:mat('Cut_Base',0xb7c2a9)};
 const lighting = createLighting({ scene, renderer, hemisphere, sun, fill, water: materials.water, reduced });
@@ -43,9 +46,14 @@ let mappedRoutes = [], routeNetwork, activeTrail = null;
 const waterfrontViews = new Map();
 let waterfrontFocus = null;
 let followTowerPresetOnResize = false;
-const atlasUI = createAtlasUI({ onPlace: setActive, onTrail: showTrail, onClose: closeDetails, onDetail: focusWaterfront });
+let tripBounds = null, tripPins = [];
+const atlasUI = createAtlasUI({
+  onPlace: setActive, onTrail: showTrail, onClose: closeDetails, onDetail: focusWaterfront, onTrip: openTrip
+});
+const tripPlanner = createTripPlanner(places, () => loadData('trip-network.json'), drawTrip, fitTrip);
 
 function setActive(index, trigger) {
+  tripPlanner.close();
   selected = index;
   clearTrail();
   waterfrontFocus = null;
@@ -56,6 +64,7 @@ function setActive(index, trigger) {
 }
 
 function closeDetails(restoreFocus) {
+  tripPlanner.close();
   clearTrail();
   waterfrontFocus = null;
   if (selected < 0) selected = 0;
@@ -71,6 +80,7 @@ function clearTrail() {
 
 function showTrail(id, trigger) {
   if (!routeNetwork) return;
+  tripPlanner.close();
   const current = mappedRoutes.find(entry => entry.route.id === id);
   activeTrail = current?.route.id ?? null;
   selected = -1;
@@ -96,6 +106,92 @@ function showTrail(id, trigger) {
   const routeView = new THREE.Vector3(.12, .89, .48).normalize().multiplyScalar(Math.max(.58, viewSpan * fit));
   fly(focus.clone().add(routeView), focus);
   setPerspective();
+}
+
+function openTrip(trigger, destination) {
+  if (!loaded) return;
+  clearTrail();
+  waterfrontFocus = null;
+  followTowerPresetOnResize = false;
+  if (selected < 0) selected = 0;
+  controls.minDistance = .3;
+  tripPlanner.open(destination);
+  atlasUI.showTrip(trigger);
+  if (stage.dataset.view === 'sky') flyToPlace(0);
+  updateInspectionFraming();
+}
+
+function drawTrip(result) {
+  tripLayer.traverse(item => {
+    item.geometry?.dispose();
+    item.material?.dispose();
+  });
+  tripLayer.clear();
+  for (const pin of tripPins) pin.element.remove();
+  tripPins = [];
+  tripBounds = null;
+  delete stage.dataset.trip;
+  if (!result?.legs.length) return;
+  const projected = [];
+  for (const leg of result.legs) {
+    const {group, points} = createTrailLayer(
+      { id:leg.mode, color:tripColors[leg.mode], legs:[leg] }, project, terrainAt, { outline:.043, line:.027 }
+    );
+    tripLayer.add(group);
+    projected.push(...points);
+  }
+  const xs = projected.map(p=>p[0]), zs = projected.map(p=>p[1]);
+  tripBounds = { left:Math.min(...xs), right:Math.max(...xs), top:Math.min(...zs), bottom:Math.max(...zs) };
+  for (const [name, point, label] of [['起',projected[0],result.from.name], ['终',projected.at(-1),result.to.name]]) {
+    const element = document.createElement('span');
+    element.className = 'map-label trip-pin';
+    element.textContent = name;
+    element.title = label;
+    const [x,z] = point;
+    tripPins.push({ element, position:new THREE.Vector3(x,terrainAt(x,z) + .02,z) });
+    $('#labels').append(element);
+  }
+  stage.dataset.trip = 'active';
+  fitTrip();
+}
+
+function tripFrame() {
+  const width = stage.clientWidth, height = stage.clientHeight;
+  const panel = $('#atlas-details');
+  const bottomSheet = compactLayout.matches || width <= 792;
+  const right = bottomSheet ? width - 54 : panel.offsetLeft - 18;
+  const bottom = bottomSheet ? panel.offsetTop - 18 : height - 58;
+  return { width, height, left:24, right:Math.max(100,right), top:82, bottom:Math.max(130,bottom) };
+}
+
+function tripViewOffset() {
+  const frame = tripFrame();
+  camera.setViewOffset(frame.width,frame.height,(frame.width-frame.left-frame.right)/2,
+    (frame.height-frame.top-frame.bottom)/2,frame.width,frame.height);
+}
+
+function fitTrip() {
+  if (!tripBounds) return;
+  setViewMode('top');
+  const f = tripFrame(), bounds = tripBounds;
+  const x = (bounds.left + bounds.right) / 2, z = (bounds.top + bounds.bottom) / 2;
+  const target = new THREE.Vector3(x,terrainAt(x,z),z);
+  const fill = Math.max((bounds.right-bounds.left)/(f.right-f.left),(bounds.bottom-bounds.top)/(f.bottom-f.top));
+  const distance = Math.max(.38, fill * f.height * .64 / Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));
+  tripViewOffset();
+  fly(target.clone().add(new THREE.Vector3(0,distance,.0001)),target);
+}
+
+function updateTripPins() {
+  if (!tripPins.length) return;
+  const width = stage.clientWidth, height = stage.clientHeight;
+  for (const {element,position} of tripPins) {
+    const point = position.clone().project(camera);
+    const x = (point.x + 1) * .5 * width, y = (1 - point.y) * .5 * height;
+    element.hidden = x < 12 || x > width - 12 || y < 50 || y > height - 16 || Math.abs(point.z) > 1;
+    element.style.left = x + 'px';
+    element.style.top = y + 'px';
+  }
 }
 function fly(position,target){controls.autoRotate=false;$('#rotate').setAttribute('aria-pressed','false');flight={start:performance.now(),from:camera.position.clone(),to:position,fromTarget:controls.target.clone(),target};if(reduced){camera.position.copy(position);controls.target.copy(target);flight=null}}
 function focusWaterfront(id) {
@@ -430,6 +526,7 @@ function updateInspectionFraming() {
   const {clientWidth: width, clientHeight: height} = stage;
   if (!width || !height) return;
   const showDetails = !$('#atlas-details').hidden;
+  if (showDetails && tripBounds) { tripViewOffset(); return; }
   if (showDetails && compactLayout.matches) {
     const placeTop = $('#atlas-details').offsetTop;
     const detailOffset = .5 - (placeTop + 64) / (2 * height);
@@ -530,6 +627,7 @@ function animate(now) {
   renderer.render(scene, camera);
   $('#compass').style.transform = 'rotate(' + (-controls.getAzimuthalAngle() * 180 / Math.PI) + 'deg)';
   updateLabels();
+  updateTripPins();
 }
 requestAnimationFrame(animate);
 controls.addEventListener('start',()=>{flight=null;followTowerPresetOnResize=false});

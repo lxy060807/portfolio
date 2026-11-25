@@ -135,7 +135,7 @@ function interpolateTrailEdge([ax, az], [bx, bz]) {
   return Array.from({ length: steps + 1 }, (_, i) => [ax + (bx - ax) * i / steps, az + (bz - az) * i / steps]);
 }
 
-export function createTrailLayer(route, project, terrainAt) {
+export function createTrailLayer(route, project, terrainAt, widths = { outline:.019, line:.011 }) {
   const group = new THREE.Group();
   group.name = 'Trail_' + route.id;
   let length = 0;
@@ -149,8 +149,8 @@ export function createTrailLayer(route, project, terrainAt) {
     }
   }
   points.push(project(route.legs.at(-1).coordinates.at(-1)));
-  group.add(trailMesh(ribbon(points, .019, .013, terrainAt), '#fff8eb', 'Trail_Outline'));
-  group.add(trailMesh(ribbon(points, .011, .014, terrainAt), route.color, 'Mapped_Trail'));
+  group.add(trailMesh(ribbon(points, widths.outline, .013, terrainAt), '#fff8eb', 'Trail_Outline'));
+  group.add(trailMesh(ribbon(points, widths.line, .014, terrainAt), route.color, 'Mapped_Trail'));
   return {group, length, points};
 }
 

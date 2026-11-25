@@ -3,18 +3,21 @@ import { trails } from './atlas-trails.js';
 import { createPlaceGallery } from './atlas-gallery.js';
 import { photoGalleries } from './atlas-photos.js';
 
-export function createAtlasUI({ onPlace, onTrail, onClose, onDetail }) {
+export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
   const details = document.querySelector('#atlas-details');
   const routeButton = document.querySelector('#route-open');
+  const tripButton = document.querySelector('#trip-open');
   const intro = document.querySelector('#selection');
   const placePanel = document.querySelector('#place-panel');
   const trailPanel = document.querySelector('#trail-panel');
+  const tripPanel = document.querySelector('#trip-panel');
   const gallery = createPlaceGallery();
   const placeList = document.querySelector('#places');
   const routeChoices = document.querySelector('#trail-choices');
   const detailChoices = document.querySelector('#waterfront-choices');
   let trigger;
   let mode;
+  let currentPlace;
 
   document.querySelector('#entrance-count').textContent = trails.length + ' 个';
   const choices = [{ id: null, name: '查看全部' }, ...trails].map(route => {
@@ -116,7 +119,9 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail }) {
     intro.hidden = true;
     placePanel.hidden = mode !== 'place';
     trailPanel.hidden = mode !== 'route';
+    tripPanel.hidden = mode !== 'trip';
     routeButton.setAttribute('aria-expanded', String(mode === 'route'));
+    tripButton.setAttribute('aria-expanded', String(mode === 'trip'));
     details.scrollTop = 0;
   }
 
@@ -127,6 +132,7 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail }) {
       return;
     }
     const place = places[index];
+    currentPlace = place.id;
     showPanel('place', nextTrigger);
     detailChoices.replaceChildren();
     detailChoices.hidden = views.length === 0;
@@ -189,17 +195,27 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail }) {
     details.hidden = true;
     intro.hidden = false;
     routeButton.setAttribute('aria-expanded', 'false');
+    tripButton.setAttribute('aria-expanded', 'false');
     mode = null;
     if (restoreFocus && trigger?.getClientRects().length) trigger.focus({preventScroll: true});
     trigger = null;
   }
 
   routeButton.addEventListener('click', () => mode === 'route' ? onClose(true) : onTrail(null, routeButton));
+  tripButton.addEventListener('click', () => mode === 'trip' ? onClose(true) : onTrip(tripButton));
+  document.querySelector('#place-trip').addEventListener('click', () => onTrip(tripButton, currentPlace));
   document.querySelector('#place-trail').addEventListener('click', () => onTrail(null, routeButton));
   document.querySelector('#atlas-close').addEventListener('click', () => onClose(true));
   details.addEventListener('keydown', event => {
     if (event.key === 'Escape') onClose(true);
   });
   highlight(0);
-  return { showPlace, showTrail, close, selectDetail };
+  return {
+    showPlace, showTrail, close, selectDetail,
+    showTrip(nextTrigger) {
+      showPanel('trip', nextTrigger);
+      highlight(-1);
+      document.querySelector('#trip-title').focus({preventScroll:true});
+    }
+  };
 }

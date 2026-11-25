@@ -4,6 +4,13 @@ Spatial dataset:
 https://github.com/Liaolai/FeelsLike_demo/blob/main/public/assets/westlake.json
 Retrieved 2026-11-23. This project reuses spatial data only; application and modeling code are original to this project.
 
+Visitor route network:
+trip-network.json contains OpenStreetMap road geometry and derived mode permissions for the atlas bounds. It is an ODbL 1.0 database from © OpenStreetMap contributors; dates are stored as data metadata when present. Directional permissions, stairs and bicycle access are evaluated separately. The permanently restricted Su and Bai Causeways and Broken Bridge are excluded from riding.
+https://download.openstreetmap.fr/extracts/asia/china/zhejiang.osm.pbf
+https://www.openstreetmap.org/copyright
+https://hznews.hangzhou.com.cn/chengshi/content/2018-05/02/content_6862048_3.htm
+https://zzhz.zjol.com.cn/hz/csxw/201909/t20190926_11086961.shtml
+
 OSM water, road, building and green-area layers:
 © OpenStreetMap contributors, Open Database License (ODbL) 1.0.
 https://www.openstreetmap.org/copyright

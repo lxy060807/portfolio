@@ -26,6 +26,7 @@
 <aside>
 <div class="intro"><h1>湖山之间，<br>看见西湖。</h1><p>一座可以慢慢探索的<br>三维空间模型。</p></div>
 <section class="locations" aria-labelledby="location-heading"><div class="location-heading"><h2 id="location-heading">景点</h2><button type="button" id="place-index-open" aria-haspopup="dialog">查找景点</button></div><div id="places"></div></section>
+<button id="trip-open" class="trip-open" type="button" aria-expanded="false" aria-controls="atlas-details"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8"/></svg>路线规划</button>
 <button id="route-open" class="route-open" aria-expanded="false" aria-controls="atlas-details"><span class="route-symbol" aria-hidden="true"></span><span>宝石山登山入口 <small id="entrance-count"></small></span></button>
 <button id="mobile-layers" class="surface" aria-expanded="false" aria-controls="spatial-layers">图层</button>
 <section id="spatial-layers" class="layers" aria-labelledby="layer-heading"><h2 id="layer-heading">空间图层</h2><label><span>建筑与地标</span><input type="checkbox" id="layer-buildings" checked></label><label><span>林木与绿地</span><input type="checkbox" id="layer-trees" checked></label><label><span>道路与堤桥</span><input type="checkbox" id="layer-roads" checked></label><label><span>地名标注</span><input type="checkbox" id="layer-labels" checked></label></section>
@@ -69,6 +70,7 @@
       <p id="place-description" class="atlas-copy"></p>
       <div class="atlas-actions">
         <button id="place-trail" type="button" hidden>查看登山路线</button>
+        <button id="place-trip" type="button">路线去这里</button>
         <a id="place-source" target="_blank" rel="noreferrer">景点资料</a>
         <a id="place-coordinate" target="_blank" rel="noreferrer" hidden>定位依据</a>
       </div>
@@ -86,6 +88,36 @@
       <p id="trail-note" class="atlas-copy"></p>
       <div class="atlas-actions"><a id="trail-source" target="_blank" rel="noreferrer">路线参考</a></div>
     </div>
+  </article>
+  <article id="trip-panel" class="atlas-content" hidden>
+    <h2 id="trip-title" tabindex="-1">景点路线规划</h2>
+    <form id="trip-form">
+      <div class="trip-stops">
+        <label>起点<select name="start" required><option value="">选起点</option></select></label>
+        <button id="trip-swap" type="button" aria-label="互换起点和终点" title="互换起点和终点">⇄</button>
+        <label>终点<select name="finish" required><option value="">选终点</option></select></label>
+      </div>
+      <fieldset class="trip-modes">
+        <legend>出行方式</legend>
+        <label><input type="radio" name="mode" value="walk" checked><span>步行</span></label>
+        <label><input type="radio" name="mode" value="bike"><span>骑行</span></label>
+      </fieldset>
+      <button type="submit" id="trip-plan">规划路线</button>
+    </form>
+    <p id="trip-status" class="atlas-copy" role="status" aria-live="polite"></p>
+    <div id="trip-result" hidden>
+      <p id="trip-endpoints"></p>
+      <strong id="trip-summary" aria-live="polite"></strong>
+      <div class="trip-result-tools">
+        <button id="trip-alternate" type="button">改骑行</button>
+        <button id="trip-edit" type="button">修改起终点</button>
+        <button id="trip-fit" type="button">查看全程</button>
+      </div>
+      <ol id="trip-parts"></ol>
+      <p id="trip-connection" class="atlas-copy" hidden>起终点以景点附近能接通的已知道路为准。</p>
+    </div>
+    <p class="trip-note">骑行指普通自行车。路线依据已知通行限制，临时封路和景区开放请看现场指示。</p>
+    <p class="trip-sources"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">道路数据</a><a href="https://hznews.hangzhou.com.cn/chengshi/content/2018-05/02/content_6862048_3.htm" target="_blank" rel="noreferrer">堤桥禁骑</a><a href="https://zzhz.zjol.com.cn/hz/csxw/201909/t20190926_11086961.shtml" target="_blank" rel="noreferrer">湖滨通行规定</a></p>
   </article>
 </section>
 <div class="tools"><button id="north" aria-label="朝向正北" title="朝向正北"><svg id="compass" viewBox="0 0 32 32" aria-hidden="true"><path class="needle" d="m16 5 6 18-6-4-6 4Z"/><path d="M16 19v8"/></svg><span>N</span></button><div class="zoom"><button id="zoom-in" aria-label="放大"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg></button><button id="zoom-out" aria-label="缩小"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div><button id="rotate" aria-label="自动旋转" aria-pressed="false" title="自动旋转"><svg viewBox="0 0 24 24"><path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/></svg></button><button id="capture" aria-label="保存场景图片" title="保存场景图片"><svg viewBox="0 0 24 24"><path d="M4 6h4l2-2h4l2 2h4v14H4Z"/><circle cx="12" cy="12" r="4"/></svg></button></div>
