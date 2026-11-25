@@ -2,14 +2,15 @@ import * as THREE from 'three';
 
 const presets = {
   day: {
-    sky: 0xe7eee9, hemisphere: 0xe4f0ff, ground: 0x778568, ambient: 2.05,
-    key: 0xffe9c2, direct: 2.85, position: [-4.4, 7.6, 3.5], fill: 0xdceffd, fillPower: .79,
-    water: 0x558d7d, exposure: 1.08, blend: 0
+    // West Lake, 10 April at 15:30 CST. 256.39° azimuth and 36.28° elevation.
+    sky: 0xe0e9ec, hemisphere: 0xd6e8ff, ground: 0x808064, ambient: 1.72,
+    key: 0xffebce, direct: 3.35, position: [-7.835, 5.917, 1.898], fill: 0xd1e5fe, fillPower: .26,
+    water: 0x517f77, exposure: 1.08, blend: 0, shadowBias: -.000065, shadowNormalBias: .004
   },
   night: {
     sky: 0x182538, hemisphere: 0x9dbfff, ground: 0x394759, ambient: .87,
     key: 0xb8ceff, direct: 1.44, position: [-3.3, 6.2, -3.7], fill: 0xffc38d, fillPower: .31,
-    water: 0x315675, exposure: 1.12, blend: 1
+    water: 0x315675, exposure: 1.12, blend: 1, shadowBias: -.00016, shadowNormalBias: .012
   }
 };
 
@@ -73,6 +74,8 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
     sun.color.setHex(p.key);
     sun.intensity = p.direct;
     sun.position.set(...p.position);
+    sun.shadow.bias = p.shadowBias;
+    sun.shadow.normalBias = p.shadowNormalBias;
     lightDirection.value.copy(sun.position).normalize();
     fill.color.setHex(p.fill);
     fill.intensity = p.fillPower;
