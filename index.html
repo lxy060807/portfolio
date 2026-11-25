@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="style.css">
   <script defer src="interactions.js"></script>
 </head>
-<body>
+<body class="portfolio-home">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header">
     <div class="frame header-row">
@@ -21,28 +21,79 @@
     </div>
   </header>
 
-  <main id="main" class="frame">
-    <section class="home-intro" aria-labelledby="home-title">
-      <h1 id="home-title"><span class="hero-line"><span>界面与</span></span><span class="hero-line"><span>交互设计</span></span></h1>
-      <div class="home-summary">
-        <p>我是 LIANG，一名 UI 与交互设计学生。作品涵盖移动端界面、空间可视化与实体产品。</p>
-        <a class="hero-action" href="#work">查看作品</a>
+  <main id="main">
+    <section class="showcase" aria-labelledby="home-title">
+      <div class="frame showcase-wrap">
+        <h1 id="home-title">界面与交互设计<span>LIANG 作品集</span></h1>
+        <fieldset class="showcase-controls">
+          <legend class="visually-hidden">切换首屏作品</legend>
+          <input class="visually-hidden" type="radio" name="showcase" id="showcase-cinis" checked>
+          <label for="showcase-cinis">CINIS</label>
+          <input class="visually-hidden" type="radio" name="showcase" id="showcase-movie">
+          <label for="showcase-movie">盲盒选片</label>
+        </fieldset>
+        <div class="showcase-scenes">
+          <article class="showcase-scene showcase-cinis" aria-labelledby="showcase-cinis-title">
+            <div class="showcase-art" aria-hidden="true">
+              <img class="showcase-image showcase-image-left" src="assets/cinis/character.png" alt="" width="533" height="1155">
+              <img class="showcase-image showcase-image-right" src="assets/cinis/reward.png" alt="" width="438" height="954">
+              <img class="showcase-image showcase-image-main" src="assets/cinis/tasks.png" alt="" width="437" height="953" fetchpriority="high">
+            </div>
+            <div class="showcase-copy">
+              <p class="showcase-type">移动端 UI、交互设计</p>
+              <h2 id="showcase-cinis-title"><span>CINIS</span>自律打卡</h2>
+              <p>用角色成长串起每日任务，从选择专注方式，到打卡后的即时反馈。</p>
+              <a class="showcase-action" href="cases/cinis.html">查看 CINIS 案例</a>
+            </div>
+          </article>
+          <article class="showcase-scene showcase-movie" aria-labelledby="showcase-movie-title">
+            <div class="showcase-art" aria-hidden="true">
+              <img class="showcase-image showcase-image-left" src="assets/movie-picker/question.png" alt="" width="750" height="1624">
+              <img class="showcase-image showcase-image-right" src="assets/movie-picker/channels.png" alt="" width="750" height="1624">
+              <img class="showcase-image showcase-image-main" src="assets/movie-picker/reveal.png" alt="" width="750" height="1624">
+            </div>
+            <div class="showcase-copy">
+              <p class="showcase-type">移动端 UI、课程设计</p>
+              <h2 id="showcase-movie-title"><span>盲盒选片</span>App</h2>
+              <p>回答三道关于观影的问题，再开盒看看今晚可以看什么。</p>
+              <a class="showcase-action" href="cases/movie-picker.html">查看盲盒选片案例</a>
+            </div>
+          </article>
+        </div>
+        <a class="showcase-all" href="#work">查看全部作品</a>
       </div>
     </section>
 
-    <section id="work" class="home-work" aria-labelledby="work-title">
-      <h2 id="work-title" class="section-label">精选作品</h2>
-      <div class="project-list">
-        <a class="project-card project-card-feature" href="cases/cinis.html" aria-labelledby="work-cinis">
-          <div class="project-media feature-screens">
-            <img src="assets/cinis/splash.png" alt="" width="407" height="889" loading="lazy">
-            <img src="assets/cinis/tasks.png" alt="CINIS 的今日任务、角色和成长进度界面" width="437" height="953">
-            <img src="assets/cinis/reward.png" alt="" width="438" height="954">
+    <section id="work" class="frame home-work" aria-labelledby="work-title">
+      <div class="work-heading">
+        <h2 id="work-title" class="section-label">精选作品</h2>
+        <div class="work-controls" hidden>
+          <button type="button" data-gallery-scroll="-1" aria-controls="project-list">上一项</button>
+          <button type="button" data-gallery-scroll="1" aria-controls="project-list">下一项</button>
+        </div>
+      </div>
+      <div class="project-list" id="project-list">
+        <a class="project-card project-card-compact" href="cases/cinis.html" aria-labelledby="work-cinis">
+          <div class="project-media cinis-cover">
+            <img src="assets/cinis/tasks.png" alt="CINIS 的今日任务和角色成长界面" width="437" height="953" loading="lazy">
+            <img src="assets/cinis/figma-growth.png" alt="CINIS 的角色、成就和累计专注时长" width="390" height="895" loading="lazy">
           </div>
           <div class="project-info">
             <p class="project-type">移动端 UI、交互设计</p>
             <h3 id="work-cinis">CINIS 自律打卡</h3>
             <p>选择角色，从今天的一项任务开始。通过专注或快速打卡完成记录，查看成长反馈。</p>
+            <span class="project-link">查看案例</span>
+          </div>
+        </a>
+        <a class="project-card project-card-compact" href="cases/movie-picker.html" aria-labelledby="work-movie-picker">
+          <div class="project-media movie-cover">
+            <img src="assets/movie-picker/home.png" alt="盲盒选片 App 的首页" width="750" height="1624" loading="lazy">
+            <img src="assets/movie-picker/reveal.png" alt="开盒后显示推荐影片的界面" width="750" height="1624" loading="lazy">
+          </div>
+          <div class="project-info">
+            <p class="project-type">移动端 UI、交互设计</p>
+            <h3 id="work-movie-picker">盲盒选片 App</h3>
+            <p>用三道问题收集观影偏好，开盒推荐一部电影，并给出观看渠道。</p>
             <span class="project-link">查看案例</span>
           </div>
         </a>

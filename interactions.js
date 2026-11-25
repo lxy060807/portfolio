@@ -1,5 +1,89 @@
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
+function onHorizontalSwipe(surface, move) {
+  let start;
+  surface.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.pointerType !== "touch") return;
+    start = { x: event.clientX, y: event.clientY };
+  });
+  surface.addEventListener("pointerup", (event) => {
+    if (!event.isPrimary || !start) return;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    start = undefined;
+    if (Math.abs(deltaX) >= 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35) {
+      move(deltaX < 0 ? 1 : -1);
+    }
+  });
+  surface.addEventListener("pointercancel", () => { start = undefined; });
+}
+
+function enableShowcaseSwipe() {
+  const stage = document.querySelector(".showcase-scenes");
+  if (!stage) return;
+  const selections = [...document.querySelectorAll('input[name="showcase"]')];
+  onHorizontalSwipe(stage, (direction) => {
+    const active = selections.findIndex((input) => input.checked);
+    const next = selections[active + direction];
+    if (next) next.checked = true;
+  });
+}
+
+function enableProjectRail() {
+  const rail = document.getElementById("project-list");
+  const controls = document.querySelector(".work-controls");
+  if (!rail || !controls) return;
+
+  const [previous, next] = [...controls.querySelectorAll("button")];
+  const cards = [...rail.querySelectorAll(".project-card")];
+  controls.hidden = false;
+  function updateControls() {
+    previous.disabled = rail.scrollLeft <= 2;
+    next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
+  }
+  function advance(direction) {
+    const distance = cards[1].offsetLeft - cards[0].offsetLeft;
+    rail.scrollBy({ left: direction * distance, behavior: reducedMotion.matches ? "instant" : "smooth" });
+  }
+  previous.addEventListener("click", () => advance(-1));
+  next.addEventListener("click", () => advance(1));
+  rail.addEventListener("scroll", updateControls, { passive: true });
+  window.addEventListener("resize", updateControls);
+
+  let pointer;
+  let suppressClick = false;
+  rail.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    suppressClick = false;
+    pointer = { id: event.pointerId, x: event.clientX, scroll: rail.scrollLeft };
+  });
+  rail.addEventListener("pointermove", (event) => {
+    if (!pointer || pointer.id !== event.pointerId || !(event.buttons & 1)) return;
+    const distance = event.clientX - pointer.x;
+    if (!suppressClick && Math.abs(distance) < 8) return;
+    if (!suppressClick) {
+      rail.setPointerCapture(event.pointerId);
+      rail.classList.add("is-dragging");
+      suppressClick = true;
+    }
+    rail.scrollLeft = pointer.scroll - distance;
+  });
+  function endDrag() {
+    pointer = undefined;
+    rail.classList.remove("is-dragging");
+  }
+  rail.addEventListener("pointerup", endDrag);
+  rail.addEventListener("pointercancel", endDrag);
+  rail.addEventListener("lostpointercapture", endDrag);
+  rail.addEventListener("dragstart", (event) => event.preventDefault());
+  rail.addEventListener("click", (event) => {
+    if (!suppressClick || event.detail === 0) return;
+    suppressClick = false;
+    event.preventDefault();
+  }, { capture: true });
+  updateControls();
+}
+
 function revealProjects() {
   if (reducedMotion.matches || !("IntersectionObserver" in window)) return;
 
@@ -153,23 +237,11 @@ function enableImageViewer() {
   });
   dialog.addEventListener("close", () => trigger?.focus({ preventScroll: true }));
 
-  let swipeStart;
-  stage.addEventListener("pointerdown", (event) => {
-    if (!event.isPrimary || event.pointerType !== "touch") return;
-    swipeStart = { x: event.clientX, y: event.clientY };
-  });
-  stage.addEventListener("pointerup", (event) => {
-    if (!event.isPrimary || !swipeStart) return;
-    const deltaX = event.clientX - swipeStart.x;
-    const deltaY = event.clientY - swipeStart.y;
-    swipeStart = undefined;
-    if (Math.abs(deltaX) >= 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35) {
-      moveViewer(deltaX < 0 ? 1 : -1);
-    }
-  });
-  stage.addEventListener("pointercancel", () => { swipeStart = undefined; });
+  onHorizontalSwipe(stage, moveViewer);
 }
 
+enableShowcaseSwipe();
+enableProjectRail();
 revealProjects();
 enableFlowButtons();
 enableSceneComparison();
