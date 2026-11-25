@@ -96,14 +96,14 @@ function largestNetwork(graph, back) {
   return new Set(largest);
 }
 
-function shortestVisitOrder(costs) {
+function shortestVisitOrder(costs, endCosts) {
   const count = costs.length;
   if (count > 10) {
     // Compare a route from every possible first stop without building an exponential table.
     let bestOrder = null, bestCost = Infinity;
     for (let start = 0; start < count; start++) {
       const order = [start], remaining = new Set(costs.keys());
-      let total = 0;
+      let total = endCosts[start];
       remaining.delete(start);
       while (remaining.size) {
         const row = costs[order.at(-1)];
@@ -116,6 +116,7 @@ function shortestVisitOrder(costs) {
         remaining.delete(next);
         total += cheapest;
       }
+      total += endCosts[order.at(-1)];
       if (!remaining.size && total < bestCost) { bestOrder = order; bestCost = total; }
     }
     return bestOrder;
@@ -125,7 +126,7 @@ function shortestVisitOrder(costs) {
   const masks = 1 << count;
   const best = new Float64Array(masks * count).fill(Infinity);
   const previous = new Int8Array(best.length).fill(-1);
-  for (let i = 0; i < count; i++) best[(1 << i) * count + i] = 0;
+  for (let i = 0; i < count; i++) best[(1 << i) * count + i] = endCosts[i];
   for (let mask = 1; mask < masks - 1; mask++) {
     for (let last = 0; last < count; last++) {
       const cost = best[mask * count + last];
@@ -141,7 +142,7 @@ function shortestVisitOrder(costs) {
   }
   let mask = masks - 1, last = 0;
   const offset = mask * count;
-  for (let i = 1; i < count; i++) if (best[offset + i] < best[offset + last]) last = i;
+  for (let i = 1; i < count; i++) if (best[offset + i] + endCosts[i] < best[offset + last] + endCosts[last]) last = i;
   if (!Number.isFinite(best[offset + last])) return null;
   const order = [];
   while (last >= 0) {
@@ -332,7 +333,10 @@ export function createTripNetwork(data) {
       }
       costs.push(row);
     }
-    const order = shortestVisitOrder(costs);
+    // Prefer a meal between sights when it doesn't add much travel.
+    const canPlaceBetweenSights = unique.filter(stop => !stop.dining).length >= 2;
+    const endCosts = unique.map(stop => canPlaceBetweenSights && stop.dining ? 12 : 0);
+    const order = shortestVisitOrder(costs, endCosts);
     if (!order) return { error: '当前出行方式无法串联所有已选景点。请试试自动推荐或调整景点。' };
     return assembleItinerary(order.map(index => routePoints[index]), between);
   }

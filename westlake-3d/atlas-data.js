@@ -1,4 +1,5 @@
 import { expandedPlaces } from './atlas-places-expanded.js';
+import { diningPlaces } from './atlas-dining.js';
 
 const heritage = 'https://whc.unesco.org/en/list/1334/';
 const mountainGuide = 'https://hznews.hangzhou.com.cn/wenti/content/2018-03/16/content_6822714.htm';
@@ -43,6 +44,7 @@ export const places = [
     summary: '断桥连通白堤东端和北山街。从桥上向西可沿白堤走向孤山，向北可辨认宝石山山脊和保俶塔。',
     source: heritage
   },
-  ...expandedPlaces
+  ...expandedPlaces,
+  ...diningPlaces
 ];
 

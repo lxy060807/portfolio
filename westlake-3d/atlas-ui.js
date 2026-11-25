@@ -12,6 +12,8 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
   const trailPanel = document.querySelector('#trail-panel');
   const tripPanel = document.querySelector('#trip-panel');
   const gallery = createPlaceGallery();
+  const galleryPanel = document.querySelector('#place-gallery');
+  const galleryCredits = placePanel.querySelector('.atlas-credits');
   const placeList = document.querySelector('#places');
   const routeChoices = document.querySelector('#trail-choices');
   const detailChoices = document.querySelector('#waterfront-choices');
@@ -48,13 +50,18 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
 
   const directory = document.querySelector('#place-index');
   const directoryButton = document.querySelector('#place-index-open');
+  const diningButton = document.querySelector('#trip-dining-open');
   const query = document.querySelector('#place-query');
   const results = document.querySelector('#place-results');
+  const categoryButtons = [...directory.querySelectorAll('[data-directory]')];
+  const budget = document.querySelector('#place-budget');
+  let category = 'sights', directoryTrigger = directoryButton;
   const normalize = value => value.toLowerCase().replace(/[\s·・（）()]+/g, '');
   const sections = new Map();
   for (const [index, place] of places.entries()) {
     if (!index) continue;
-    const region = place.region ?? '湖面、堤岛与宝石山';
+    const dining = place.dining;
+    const region = dining ? '西湖周边餐厅' : place.region ?? '湖面、堤岛与宝石山';
     if (!sections.has(region)) {
       const section = document.createElement('section');
       const title = document.createElement('h3');
@@ -69,33 +76,61 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
     button.type = 'button';
     button.className = 'place-result';
     name.textContent = place.name;
-    kind.textContent = place.kind;
+    kind.textContent = dining ? '¥' + dining.price + '/人 · ' + dining.rating.toFixed(1) + '/5' : place.kind;
     button.append(name, kind);
+    if (dining) {
+      const address = document.createElement('span');
+      address.className = 'place-result-address';
+      address.textContent = dining.address;
+      button.append(address);
+      button.classList.add('place-result-dining');
+    }
     button.addEventListener('click', () => {
       directory.close();
-      onPlace(index, directoryButton);
+      onPlace(index, directoryTrigger);
     });
     const { section, items } = sections.get(region);
     section.append(button);
-    items.push({ button, text: normalize([place.name, place.kind, place.sector, region, ...(place.aliases ?? [])].join(' ')) });
+    items.push({ button, dining, text: normalize([
+      place.name, place.kind, place.sector, region, dining?.address, dining?.cuisine, ...(place.aliases ?? [])
+    ].join(' ')) });
   }
 
   function filterPlaces() {
     const term = normalize(query.value);
+    const diningOnly = category === 'dining';
+    const maxPrice = Number(budget.value) || Infinity;
     let matched = false;
     for (const { section, items } of sections.values()) {
-      for (const item of items) item.button.hidden = !item.text.includes(term);
+      for (const item of items) {
+        item.button.hidden = Boolean(item.dining) !== diningOnly || !item.text.includes(term)
+          || (diningOnly && item.dining.price > maxPrice);
+      }
       section.hidden = items.every(item => item.button.hidden);
       matched ||= !section.hidden;
     }
     document.querySelector('#place-index-empty').hidden = matched;
   }
 
-  directoryButton.addEventListener('click', () => {
-    query.value = '';
+  function setCategory(next) {
+    category = next;
+    const diningOnly = next === 'dining';
+    document.querySelector('#place-budget-filter').hidden = !diningOnly;
+    query.placeholder = diningOnly ? '例如 外婆家、杨公堤' : '例如 花港观鱼、里西湖';
+    for (const button of categoryButtons) button.setAttribute('aria-pressed', String(button.dataset.directory === next));
     filterPlaces();
+  }
+  function openDirectory(next, button) {
+    directoryTrigger = button;
+    query.value = '';
+    budget.value = '';
+    setCategory(next);
     directory.showModal();
-  });
+  }
+  directoryButton.addEventListener('click', () => openDirectory('sights', directoryButton));
+  diningButton.addEventListener('click', () => openDirectory('dining', diningButton));
+  for (const button of categoryButtons) button.addEventListener('click', () => setCategory(button.dataset.directory));
+  budget.addEventListener('change', filterPlaces);
   document.querySelector('#place-index-close').addEventListener('click', () => directory.close());
   query.addEventListener('input', filterPlaces);
   query.addEventListener('keydown', event => {
@@ -146,10 +181,22 @@ export function createAtlasUI({ onPlace, onTrail, onClose, onDetail, onTrip }) {
       button.addEventListener('click', () => onDetail(view.id));
       detailChoices.append(button);
     }
-    gallery.show(place.name, photoGalleries[place.id]);
-    document.querySelector('#place-kind').textContent = place.kind + ' · ' + place.sector;
+    const photos = photoGalleries[place.id];
+    galleryPanel.hidden = galleryCredits.hidden = !photos?.length;
+    if (photos?.length) gallery.show(place.name, photos);
+    document.querySelector('#place-kind').textContent = (place.dining?.cuisine ?? place.kind) + ' · ' + place.sector;
     document.querySelector('#place-title').textContent = place.name;
     document.querySelector('#place-description').textContent = place.summary;
+    const dining = place.dining;
+    document.querySelector('#place-dining').hidden = !dining;
+    document.querySelector('#place-trip').textContent = dining ? '加入行程用餐' : '路线去这里';
+    document.querySelector('#place-source').textContent = dining ? '查看携程评分与菜单' : '景点资料';
+    if (dining) {
+      document.querySelector('#dining-price').textContent = '约 ¥' + dining.price + '/人';
+      document.querySelector('#dining-score').textContent = dining.rating.toFixed(1) + '/5 · ' + dining.reviews + ' 条点评';
+      document.querySelector('#dining-address').textContent = dining.address;
+      document.querySelector('#dining-hours').textContent = dining.hours;
+    }
     document.querySelector('#place-trail').hidden = !place.nearTrail;
     document.querySelector('#place-source').href = place.source;
     const coordinate = document.querySelector('#place-coordinate');

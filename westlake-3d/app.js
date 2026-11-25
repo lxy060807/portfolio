@@ -153,7 +153,7 @@ function drawTrip(result, draft = []) {
     if (!stage.hasAttribute('data-trip-picking')) {
       const mapStops = new Map();
       for (const {stop, mark} of draft) {
-        if (!mapStops.has(stop.id)) mapStops.set(stop.id, {coordinates:stop.c,names:[stop.name],labels:[]});
+        if (!mapStops.has(stop.id)) mapStops.set(stop.id, {coordinates:stop.c,names:[stop.name],labels:[],meal:Boolean(stop.dining)});
         mapStops.get(stop.id).labels.push(mark);
       }
       addTripPins(mapStops);
@@ -179,6 +179,7 @@ function drawTrip(result, draft = []) {
     const marker = mapStops.get(point.node);
     marker.names.push(point.stop.name);
     marker.labels.push(i === 0 ? '起' : i === result.routePoints.length - 1 ? '终' : String(i));
+    marker.meal ||= Boolean(point.stop.dining);
   }
   addTripPins(mapStops);
   stage.dataset.trip = 'active';
@@ -186,9 +187,10 @@ function drawTrip(result, draft = []) {
 }
 
 function addTripPins(mapStops) {
-  for (const {coordinates,names,labels:marks} of mapStops.values()) {
+  for (const {coordinates,names,labels:marks,meal} of mapStops.values()) {
     const element = document.createElement('span');
     element.className = 'map-label trip-pin';
+    if (meal) element.classList.add('dining-marker');
     element.textContent = marks.length <= 2 ? marks.join('·') : marks[0] + '＋' + (marks.length - 1);
     element.title = [...new Set(names)].join('、');
     const [x,z] = project(coordinates);
@@ -416,7 +418,11 @@ function build(d, footprintData){
    if (index >= 0) {
      el.type = 'button';
      el.dataset.place = places[index].id;
-     el.title = name;
+     el.title = places[index].name;
+     if (places[index].dining) {
+       el.classList.add('dining-marker');
+       el.setAttribute('aria-label', places[index].name);
+     }
      el.addEventListener('click', () => setActive(index, el));
    }
    $('#labels').appendChild(el);
@@ -424,15 +430,16 @@ function build(d, footprintData){
  }
  for (let i = 1; i < places.length; i++) {
    const place = places[i], [x,z] = project(place.c);
-   addMarker(place.name, x, z, place.markerHeight ?? .025, i);
+   addMarker(place.dining?.label ?? place.name, x, z, place.markerHeight ?? .025, i);
  }
  for (const stop of tripStops(places)) {
    const [x,z] = project(stop.c);
    const el = document.createElement('button');
    el.type = 'button';
    el.className = 'map-label trip-choice';
+   if (stop.dining) el.classList.add('dining-marker');
    el.dataset.tripStop = stop.id;
-   el.textContent = stop.name;
+   el.textContent = stop.dining?.label ?? stop.name;
    el.hidden = true;
    el.addEventListener('click', () => tripPlanner.pick(stop.id));
    $('#labels').append(el);

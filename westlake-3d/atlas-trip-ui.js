@@ -26,17 +26,20 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   const visitList = document.querySelector('#trip-visit-list');
   const mapPlan = document.querySelector('#trip-map-plan');
   const suggestedOrder = document.querySelector('#trip-visit-order');
+  const mealSettings = document.querySelector('#trip-meal-duration');
+  const mealSection = document.querySelector('#trip-meals');
   modeKey.style.setProperty('--trip-walk', tripColors.walk);
   modeKey.style.setProperty('--trip-bike', tripColors.bike);
   const roleNames = { start:'起点', via:'途经点', finish:'终点' };
   const stops = new Map(tripStops(places).map(place => [place.id, place]));
+  const optionLabel = stop => stop.name + (stop.water ? '（湖中）' : stop.dining ? ' · ¥' + stop.dining.price + '/人' : '');
   function addStopOptions(select) {
-    for (const stop of stops.values()) select.add(new Option(stop.name + (stop.water ? '（湖中）' : ''), stop.id));
+    for (const stop of stops.values()) select.add(new Option(optionLabel(stop), stop.id));
   }
   addStopOptions(start);
   addStopOptions(finish);
   const chosenPlaces = new Set();
-  for (const stop of stops.values()) if (!stop.water) visitAdd.add(new Option(stop.name, stop.id));
+  for (const stop of stops.values()) if (!stop.water) visitAdd.add(new Option(optionLabel(stop), stop.id));
   let network, request = 0, pickRole = null, clearedRoute = null;
   const isVisit = () => form.elements.order.value === 'visit';
 
@@ -125,7 +128,9 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     const canClear = isVisit() ? chosenPlaces.size > 0 : Boolean(start.value || finish.value || waypoints.children.length);
     for (const button of clearButtons) button.disabled = !canClear;
     mapPlan.disabled = chosenPlaces.size < 2;
-    draw(null, showDraft ? draftPoints() : []);
+    const draft = draftPoints();
+    mealSettings.hidden = !draft.some(point => point.stop.dining);
+    draw(null, showDraft ? draft : []);
   }
 
   function setPickRole(role, chosen = '') {
@@ -290,6 +295,34 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     return row;
   }
 
+  function showMeals(path) {
+    const list = document.querySelector('#trip-meal-stops');
+    list.replaceChildren();
+    let totalPrice = 0;
+    for (const [index, {stop}] of path.entries()) {
+      const dining = stop.dining;
+      if (!dining) continue;
+      totalPrice += dining.price;
+      const item = document.createElement('li');
+      const name = document.createElement('strong');
+      const facts = document.createElement('span');
+      const menu = document.createElement('a');
+      name.textContent = '第 ' + (index + 1) + ' 站 · ' + stop.name;
+      facts.textContent = '约 ¥' + dining.price + '/人 · ' + dining.rating.toFixed(1) + '/5 · ' + dining.hours;
+      menu.textContent = '查看携程菜单与评价';
+      menu.href = stop.source;
+      menu.target = '_blank';
+      menu.rel = 'noreferrer';
+      item.append(name, facts, menu);
+      list.append(item);
+    }
+    const count = list.childElementCount;
+    mealSection.hidden = !count;
+    document.querySelector('#trip-meal-summary').textContent = count
+      ? '参考餐费约 ¥' + totalPrice + '/人 · 另预留 ' + (count * Number(form.elements.mealMinutes.value)) + ' 分钟用餐'
+      : '';
+  }
+
   function show(result) {
     const total = result.legs.reduce((sum, leg) => sum + leg.distance, 0);
     const minutes = result.segments.reduce((sum, segment) => sum + segment.minutes, 0);
@@ -307,9 +340,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     suggestedOrder.replaceChildren();
     if (isVisit()) for (const {stop} of path) {
       const item = document.createElement('li');
-      item.textContent = stop.name;
+      item.textContent = stop.dining ? stop.name + ' · 用餐' : stop.name;
       suggestedOrder.append(item);
     }
+    showMeals(path);
     summary.textContent = (chosenMode === 'auto' ? '自动推荐 · ' : '') + modes.join('＋')
       + ' · ' + amount(total) + ' · 约 ' + Math.max(1, Math.round(minutes)) + ' 分钟';
     alternate.dataset.mode = chosenMode === 'bike' || (chosenMode === 'auto' && hasCycling) ? 'walk' : 'bike';
@@ -397,6 +431,15 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
         if (isVisit()) {
           chosenPlaces.add(place);
           renderVisitList();
+        } else if (stops.get(place).dining && start.value && finish.value) {
+          if (!itineraryFields().some(field => field.value === place)) {
+            const empty = [...waypoints.querySelectorAll('select')].find(field => !field.value);
+            if (empty) empty.value = place;
+            else {
+              addWaypoint(place);
+              updateWaypoints();
+            }
+          }
         } else finish.value = place;
       }
       reset();

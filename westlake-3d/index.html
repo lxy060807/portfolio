@@ -25,7 +25,7 @@
 <main>
 <aside>
 <div class="intro"><h1>湖山之间，<br>看见西湖。</h1><p>一座可以慢慢探索的<br>三维空间模型。</p></div>
-<section class="locations" aria-labelledby="location-heading"><div class="location-heading"><h2 id="location-heading">景点</h2><button type="button" id="place-index-open" aria-haspopup="dialog">查找景点</button></div><div id="places"></div></section>
+<section class="locations" aria-labelledby="location-heading"><div class="location-heading"><h2 id="location-heading">景点与餐厅</h2><button type="button" id="place-index-open" aria-haspopup="dialog">查找地点</button></div><div id="places"></div></section>
 <button id="trip-open" class="trip-open" type="button" aria-expanded="false" aria-controls="atlas-details"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8"/></svg>路线规划</button>
 <button id="route-open" class="route-open" aria-expanded="false" aria-controls="atlas-details"><span class="route-symbol" aria-hidden="true"></span><span>宝石山登山入口 <small id="entrance-count"></small></span></button>
 <button id="mobile-layers" class="surface" aria-expanded="false" aria-controls="spatial-layers">图层</button>
@@ -68,6 +68,15 @@
     <div class="atlas-content place-content">
       <div id="waterfront-choices" class="waterfront-choices" role="group" hidden></div>
       <p id="place-description" class="atlas-copy"></p>
+      <div id="place-dining" hidden>
+        <dl class="dining-facts">
+          <div><dt>参考人均</dt><dd id="dining-price"></dd></div>
+          <div><dt>携程综合评分</dt><dd id="dining-score"></dd></div>
+          <div><dt>地址</dt><dd id="dining-address"></dd></div>
+          <div><dt>参考营业时间</dt><dd id="dining-hours"></dd></div>
+        </dl>
+        <p class="dining-source-note">价格、评分和营业时间来自携程公开页面，核对于 2026-11-25。营业安排以门店为准。</p>
+      </div>
       <div class="atlas-actions">
         <button id="place-trail" type="button" hidden>查看登山路线</button>
         <button id="place-trip" type="button">路线去这里</button>
@@ -99,6 +108,7 @@
       </fieldset>
       <div class="trip-stop-tools">
         <button id="trip-map-open" type="button">在地图上选</button>
+        <button id="trip-dining-open" type="button" aria-haspopup="dialog">找餐厅</button>
         <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
       <div id="trip-visit">
@@ -120,6 +130,14 @@
         <label><input type="radio" name="mode" value="walk"><span>步行</span></label>
         <label><input type="radio" name="mode" value="bike"><span>骑行</span></label>
       </fieldset>
+      <label id="trip-meal-duration" class="trip-meal-duration" hidden>每餐预留
+        <select name="mealMinutes">
+          <option value="30">30 分钟</option>
+          <option value="45" selected>45 分钟</option>
+          <option value="60">60 分钟</option>
+          <option value="90">90 分钟</option>
+        </select>
+      </label>
       <button type="submit" id="trip-plan">规划路线</button>
     </form>
     <div id="trip-map-picker" hidden>
@@ -150,6 +168,11 @@
         <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
       <ol id="trip-visit-order" aria-label="推荐游览顺序" hidden></ol>
+      <section id="trip-meals" class="trip-meals" aria-labelledby="trip-meal-heading" hidden>
+        <h3 id="trip-meal-heading">用餐安排</h3>
+        <p id="trip-meal-summary"></p>
+        <ul id="trip-meal-stops"></ul>
+      </section>
       <ul id="trip-mode-key" class="trip-mode-key" aria-label="路线颜色" hidden>
         <li class="trip-key-walk">步行</li>
         <li class="trip-key-bike">骑行</li>
@@ -168,10 +191,22 @@
 </section>
 </main>
 <dialog id="place-index" aria-labelledby="place-index-title">
-  <div class="place-index-heading"><h2 id="place-index-title">查找景点</h2><button id="place-index-close" class="quiet" type="button">关闭</button></div>
-  <label for="place-query">景点名称或区域</label>
+  <div class="place-index-heading"><h2 id="place-index-title">查找地点</h2><button id="place-index-close" class="quiet" type="button">关闭</button></div>
+  <div class="place-category" role="group" aria-label="地点类别">
+    <button type="button" data-directory="sights" aria-pressed="true">景点</button>
+    <button type="button" data-directory="dining" aria-pressed="false">餐厅</button>
+  </div>
+  <label for="place-query">地点名称或区域</label>
   <input id="place-query" type="search" placeholder="例如 花港观鱼、里西湖" autocomplete="off" autofocus>
-  <p id="place-index-empty" role="status" hidden>没有找到匹配的景点。</p>
+  <label id="place-budget-filter" hidden>参考人均
+    <select id="place-budget" name="budget">
+      <option value="">不限</option>
+      <option value="100">¥100 以内</option>
+      <option value="150">¥150 以内</option>
+      <option value="250">¥250 以内</option>
+    </select>
+  </label>
+  <p id="place-index-empty" role="status" hidden>没有找到匹配的地点。</p>
   <div id="place-results"></div>
 </dialog>
 <dialog id="about"><button id="about-close" class="quiet close" autofocus>关闭</button><h2>关于这座空间模型</h2><p>本作品呈现西湖湖体及周边街区的空间关系，是供设计探索与作品集展示的概念模型。</p><section id="render-downloads" aria-labelledby="render-title"><h3 id="render-title">高清渲染</h3><div class="render-actions"><a href="renders/westlake-day.jpg" target="_blank" rel="noopener">查看日光航拍大图</a><a href="renders/westlake-sky.jpg" target="_blank" rel="noopener">查看湖畔晴空大图</a></div><p>航拍日景与夜景共用机位。另有湖畔机位可以同看太阳、薄云与湖面。日景参考杭州西湖春季 15:30 的太阳位置，并使用大气散射天空补光。屋面颜色和植被细节为材质演绎。</p></section><dl><dt>湖岸、岛屿与宝石山步道</dt><dd>使用 OpenStreetMap 平面几何。宝石山六条线路沿已有街巷、台阶和山脊游步道绘制。黄龙洞牌坊为定位参考，登山标线从后山口开始。蛤蟆峰图钉为附近观景区域参考点。</dd><dt>山体与地形</dt><dd>来自 Copernicus GLO-30 的重采样 DSM 网格。显示高度夸张 1.8 倍，并进行平滑与湖面处理。DSM 包含部分植被与建筑影响。</dd><dt>建筑、地标与树木</dt><dd>建筑采用 Overture Maps 与 OpenStreetMap 轮廓，保留位置、朝向和主要外形。有高度或层数时沿用数据，缺失高度以 5.5 米示意。塔、岩石和植被为简化模型。</dd><dt>可编辑文件</dt><dd>Blender 包含白天与夜景两个渲染场景。两套灯光共用地图对象和航拍相机。GLB 适用于其他三维工具。</dd></dl><div id="about-downloads"></div><p class="source">数据整理：<a href="https://github.com/Liaolai/FeelsLike_demo/blob/main/public/assets/westlake.json" target="_blank" rel="noreferrer">FeelsLike_demo 公开空间数据</a>。<br>OSM 与 Overture 建筑图层按 ODbL 1.0 提供。<a href="westlake.json" download>西湖基底数据</a> · <a href="building-footprints.json" download>建筑轮廓数据</a>。<br>地形：© DLR e.V. 2010–2014 / © Airbus Defence and Space GmbH 2014–2018，欧盟与 ESA 通过 Copernicus 提供。<a href="SOURCES.txt">完整来源说明</a>。</p></dialog>
