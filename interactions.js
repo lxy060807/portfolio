@@ -32,30 +32,87 @@ function enableShowcaseSwipe() {
 function enableProjectRail() {
   const rail = document.getElementById("project-list");
   const controls = document.querySelector(".work-controls");
-  if (!rail || !controls) return;
+  const filters = document.querySelector(".work-filters");
+  if (!rail || !controls || !filters) return;
 
   const [previous, next] = [...controls.querySelectorAll("button")];
   const cards = [...rail.querySelectorAll(".project-card")];
+  const filterButtons = [...filters.querySelectorAll("[data-project-filter]")];
+  let visibleCards = cards;
+  let paintFrame;
   controls.hidden = false;
-  function updateControls() {
-    previous.disabled = rail.scrollLeft <= 2;
-    next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
+  filters.hidden = false;
+
+  function updateRail() {
+    const { scrollLeft, clientWidth, scrollWidth } = rail;
+    const center = scrollLeft + clientWidth / 2;
+    const poses = visibleCards.map((card) => {
+      const delta = card.offsetLeft + card.offsetWidth / 2 - center;
+      return { card, delta, offset: Math.max(-1, Math.min(1, delta / (clientWidth * .46))) };
+    });
+    const centered = poses.reduce((nearest, pose) =>
+      Math.abs(pose.delta) < Math.abs(nearest.delta) ? pose : nearest);
+
+    previous.disabled = scrollLeft <= 2;
+    next.disabled = scrollLeft + clientWidth >= scrollWidth - 2;
+    for (const { card, offset } of poses) {
+      card.toggleAttribute("data-centered", card === centered.card);
+      card.style.setProperty("--rail-turn", `${-offset * 22}deg`);
+      card.style.setProperty("--rail-roll", `${offset * 4}deg`);
+      card.style.setProperty("--rail-scale", 1 - Math.abs(offset) * .08);
+    }
   }
+
+  function queueRailUpdate() {
+    cancelAnimationFrame(paintFrame);
+    paintFrame = requestAnimationFrame(updateRail);
+  }
+
   function advance(direction) {
-    const distance = cards[1].offsetLeft - cards[0].offsetLeft;
+    if (visibleCards.length < 2) return;
+    const distance = visibleCards[1].offsetLeft - visibleCards[0].offsetLeft;
     rail.scrollBy({ left: direction * distance, behavior: reducedMotion.matches ? "instant" : "smooth" });
   }
+
   previous.addEventListener("click", () => advance(-1));
   next.addEventListener("click", () => advance(1));
-  rail.addEventListener("scroll", updateControls, { passive: true });
-  window.addEventListener("resize", updateControls);
+  rail.addEventListener("scroll", queueRailUpdate, { passive: true });
+  window.addEventListener("resize", queueRailUpdate);
+
+  for (const button of filterButtons) {
+    button.addEventListener("click", () => {
+      if (button.getAttribute("aria-pressed") === "true") return;
+      for (const choice of filterButtons) choice.setAttribute("aria-pressed", String(choice === button));
+      const kind = button.dataset.projectFilter;
+      visibleCards = cards.filter((card) => {
+        card.hidden = kind !== "all" && card.dataset.projectKind !== kind;
+        return !card.hidden;
+      });
+      rail.scrollTo({ left: 0, behavior: "instant" });
+      updateRail();
+      if (!reducedMotion.matches) {
+        rail.getAnimations().forEach((animation) => animation.cancel());
+        rail.animate([{ opacity: .4, translate: "12px" }, { opacity: 1, translate: "none" }], {
+          duration: 420,
+          easing: "cubic-bezier(.16, 1, .3, 1)",
+        });
+      }
+    });
+  }
 
   let pointer;
   let suppressClick = false;
   rail.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "mouse" || event.button !== 0) return;
     suppressClick = false;
-    pointer = { id: event.pointerId, x: event.clientX, scroll: rail.scrollLeft };
+    pointer = {
+      id: event.pointerId,
+      x: event.clientX,
+      scroll: rail.scrollLeft,
+      lastX: event.clientX,
+      lastTime: event.timeStamp,
+      velocity: 0,
+    };
   });
   rail.addEventListener("pointermove", (event) => {
     if (!pointer || pointer.id !== event.pointerId || !(event.buttons & 1)) return;
@@ -67,10 +124,20 @@ function enableProjectRail() {
       suppressClick = true;
     }
     rail.scrollLeft = pointer.scroll - distance;
+    const elapsed = Math.max(event.timeStamp - pointer.lastTime, 1);
+    pointer.velocity = pointer.velocity * .45 + (pointer.lastX - event.clientX) / elapsed * .55;
+    pointer.lastX = event.clientX;
+    pointer.lastTime = event.timeStamp;
   });
-  function endDrag() {
+  function endDrag(event) {
+    if (!pointer) return;
+    const velocity = pointer.velocity;
+    const recent = event.timeStamp - pointer.lastTime < 110;
     pointer = undefined;
     rail.classList.remove("is-dragging");
+    if (!suppressClick || !recent || event.type !== "pointerup" || reducedMotion.matches) return;
+    const offset = Math.max(-rail.clientWidth, Math.min(rail.clientWidth, velocity * 175));
+    rail.scrollTo({ left: rail.scrollLeft + offset, behavior: "smooth" });
   }
   rail.addEventListener("pointerup", endDrag);
   rail.addEventListener("pointercancel", endDrag);
@@ -81,7 +148,7 @@ function enableProjectRail() {
     suppressClick = false;
     event.preventDefault();
   }, { capture: true });
-  updateControls();
+  updateRail();
 }
 
 function revealProjects() {

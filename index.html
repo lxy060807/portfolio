@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#faf7f2">
   <title>LIANG 的 UI 与交互设计作品集</title>
   <link rel="stylesheet" href="style.css">
+  <script src="cover-transitions.js"></script>
   <script defer src="interactions.js"></script>
 </head>
 <body class="portfolio-home">
@@ -41,7 +42,7 @@
             </div>
             <div class="showcase-copy">
               <p class="showcase-type">移动端 UI、交互设计</p>
-              <h2 id="showcase-cinis-title"><span>CINIS</span>自律打卡</h2>
+              <h2 id="showcase-cinis-title"><span><b>CINIS</b></span><span><b>自律打卡</b></span></h2>
               <p>用角色成长串起每日任务，从选择专注方式，到打卡后的即时反馈。</p>
               <a class="showcase-action" href="cases/cinis.html">查看 CINIS 案例</a>
             </div>
@@ -54,7 +55,7 @@
             </div>
             <div class="showcase-copy">
               <p class="showcase-type">移动端 UI、课程设计</p>
-              <h2 id="showcase-movie-title"><span>盲盒选片</span>App</h2>
+              <h2 id="showcase-movie-title"><span><b>盲盒选片</b></span><span><b>App</b></span></h2>
               <p>回答三道关于观影的问题，再开盒看看今晚可以看什么。</p>
               <a class="showcase-action" href="cases/movie-picker.html">查看盲盒选片案例</a>
             </div>
@@ -67,13 +68,19 @@
     <section id="work" class="frame home-work" aria-labelledby="work-title">
       <div class="work-heading">
         <h2 id="work-title" class="section-label">精选作品</h2>
+        <div class="work-filters" aria-label="按作品类型筛选" role="group" hidden>
+          <button type="button" data-project-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-project-filter="ui" aria-pressed="false">界面</button>
+          <button type="button" data-project-filter="object" aria-pressed="false">实体</button>
+          <button type="button" data-project-filter="space" aria-pressed="false">空间</button>
+        </div>
         <div class="work-controls" hidden>
           <button type="button" data-gallery-scroll="-1" aria-controls="project-list">上一项</button>
           <button type="button" data-gallery-scroll="1" aria-controls="project-list">下一项</button>
         </div>
       </div>
       <div class="project-list" id="project-list">
-        <a class="project-card project-card-compact" href="cases/cinis.html" aria-labelledby="work-cinis">
+        <a class="project-card project-card-compact" href="cases/cinis.html" aria-labelledby="work-cinis" data-project-kind="ui">
           <div class="project-media cinis-cover">
             <img src="assets/cinis/tasks.png" alt="CINIS 的今日任务和角色成长界面" width="437" height="953" loading="lazy">
             <img src="assets/cinis/figma-growth.png" alt="CINIS 的角色、成就和累计专注时长" width="390" height="895" loading="lazy">
@@ -85,7 +92,7 @@
             <span class="project-link">查看案例</span>
           </div>
         </a>
-        <a class="project-card project-card-compact" href="cases/movie-picker.html" aria-labelledby="work-movie-picker">
+        <a class="project-card project-card-compact" href="cases/movie-picker.html" aria-labelledby="work-movie-picker" data-project-kind="ui">
           <div class="project-media movie-cover">
             <img src="assets/movie-picker/home.png" alt="盲盒选片 App 的首页" width="750" height="1624" loading="lazy">
             <img src="assets/movie-picker/reveal.png" alt="开盒后显示推荐影片的界面" width="750" height="1624" loading="lazy">
@@ -97,7 +104,7 @@
             <span class="project-link">查看案例</span>
           </div>
         </a>
-        <a class="project-card project-card-compact" href="cases/westlake.html" aria-labelledby="work-westlake">
+        <a class="project-card project-card-compact" href="cases/westlake.html" aria-labelledby="work-westlake" data-project-kind="space">
           <div class="project-media">
             <img src="assets/westlake-day.jpg" alt="俯瞰西湖三维模型，苏堤穿过湖面" width="1440" height="900" loading="lazy">
           </div>
@@ -108,7 +115,7 @@
             <span class="project-link">查看案例</span>
           </div>
         </a>
-        <a class="project-card project-card-compact" href="cases/peacock.html" aria-labelledby="work-peacock">
+        <a class="project-card project-card-compact" href="cases/peacock.html" aria-labelledby="work-peacock" data-project-kind="object">
           <div class="project-media">
             <img src="assets/peacock/kit.jpg" alt="孔雀纹样的绿金礼盒与棋盘、骰子和卡牌" width="2000" height="2000" loading="lazy">
           </div>
@@ -119,7 +126,7 @@
             <span class="project-link">查看案例</span>
           </div>
         </a>
-        <a class="project-card project-card-compact" href="cases/gaming-chair.html" aria-labelledby="work-chair">
+        <a class="project-card project-card-compact" href="cases/gaming-chair.html" aria-labelledby="work-chair" data-project-kind="object">
           <div class="project-media chair-cover">
             <img src="assets/chair/ivory.png" alt="米白色高背电竞椅，带包覆式头枕和滚轮底座" width="525" height="707" loading="lazy">
           </div>

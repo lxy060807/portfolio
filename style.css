@@ -306,6 +306,7 @@ h1 {
 }
 
 .showcase-copy h2 span { display: block; }
+.showcase-copy h2 b { display: block; font-weight: inherit; }
 .showcase-copy > p { color: var(--stage-muted); }
 .showcase-copy .showcase-type { color: var(--scene-accent); }
 
@@ -334,7 +335,8 @@ h1 {
   position: relative;
   grid-area: 1 / 2;
   min-block-size: 18rem;
-  pointer-events: none;
+  perspective: 78rem;
+  transform-style: preserve-3d;
 }
 
 .showcase-image {
@@ -345,15 +347,17 @@ h1 {
   block-size: auto;
   max-block-size: 86%;
   object-fit: contain;
-  transform: translate(-50%, -50%) rotate(var(--rotation, 0deg)) scale(var(--size, 1));
+  transform: translate(-50%, -50%) translateZ(var(--depth, 0)) rotateY(var(--yaw, 0deg))
+    rotate(var(--rotation, 0deg)) scale(var(--size, 1));
   filter: drop-shadow(0 16px 24px #100a099e);
 }
 
-.showcase-image-left { --x: 24%; --rotation: -12deg; --size: .73; }
-.showcase-image-right { --x: 75%; --rotation: 12deg; --size: .73; }
+.showcase-image-left { --x: 24%; --rotation: -12deg; --yaw: 22deg; --size: .74; }
+.showcase-image-right { --x: 75%; --rotation: 12deg; --yaw: -22deg; --size: .74; }
 
 .showcase-image-main {
   --rotation: -2deg;
+  --depth: 3.6rem;
   z-index: 1;
 }
 
@@ -368,9 +372,13 @@ h1 {
   border-block-start: 1px solid var(--line);
 }
 
-.work-controls:not([hidden]) { display: flex; gap: .45rem; }
+.work-controls:not([hidden]), .work-filters:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
 
-.work-controls button {
+.work-controls button, .work-filters button {
   min-block-size: 2.75rem;
   padding: .35rem .75rem;
   border: 1px solid var(--line);
@@ -382,7 +390,8 @@ h1 {
 }
 
 .work-controls button:disabled { opacity: .52; cursor: default; }
-.work-controls button:not(:disabled):hover { border-color: var(--accent); }
+.work-controls button:not(:disabled):hover, .work-filters button:hover { border-color: var(--accent); }
+.work-filters button[aria-pressed="true"] { background: var(--accent); color: var(--white); border-color: var(--accent); }
 
 .section-label {
   padding-block: clamp(1rem, 2.4vw, 2rem) clamp(1.1rem, 2.5vw, 2.25rem);
@@ -392,6 +401,7 @@ h1 {
 }
 
 .project-list {
+  position: relative;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: calc((100% - 2 * clamp(1rem, 2.5vw, 2rem)) / 3);
@@ -399,7 +409,7 @@ h1 {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scroll-snap-type: x mandatory;
-  padding: .45rem .35rem 1rem;
+  padding: 1rem .35rem 1.1rem;
   scrollbar-color: var(--line) transparent;
 }
 
@@ -410,6 +420,7 @@ h1 {
 }
 
 .project-list.is-dragging a { cursor: grabbing; }
+.project-list .project-card[hidden] { display: none; }
 
 .project-card {
   display: grid;
@@ -423,9 +434,29 @@ h1 {
 .project-card:hover { color: var(--white); }
 
 .project-media {
+  position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
   background: var(--surface);
+}
+
+.project-list .project-media::after {
+  position: absolute;
+  z-index: 1;
+  inset: .55rem;
+  border: 2px solid #fff9ea;
+  border-radius: .3rem .75rem .4rem .6rem;
+  box-shadow: inset 0 0 0 1px #211d1766;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  pointer-events: none;
+  transition: clip-path 520ms var(--ease-out), opacity 220ms ease-out;
+  content: "";
+}
+
+.project-list .project-card[data-centered] .project-media::after {
+  clip-path: inset(0);
+  opacity: 1;
 }
 
 .project-media img {
@@ -556,6 +587,41 @@ h1 {
   margin-block-start: 1.2rem;
   font-size: clamp(1.05rem, 1.7vw, 1.3rem);
 }
+
+.case-cover {
+  display: grid;
+  overflow: hidden;
+  margin-block-end: clamp(2rem, 6vw, 5.4rem);
+  margin-inline: calc(-1 * var(--gutter));
+  background: var(--dark);
+}
+
+.case-cover img { display: block; width: 100%; height: auto; }
+
+.case-cover-screens {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: clamp(.45rem, 4vw, 3rem);
+  padding: clamp(1.2rem, 4vw, 3.5rem) clamp(.85rem, 10vw, 9rem);
+}
+
+.case-cover-screens img {
+  max-height: min(65vh, 36rem);
+  object-fit: contain;
+}
+
+.case-cover-cinis { background: radial-gradient(ellipse at center, #70543d, #211b16 75%); }
+.case-cover-movie { background: radial-gradient(ellipse at center, #805559, #32242b 75%); }
+
+.case-cover-chair {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  height: clamp(17rem, 47vw, 42rem);
+  background: var(--surface);
+}
+
+.case-cover-chair img, .case-cover-image img { height: 100%; min-height: 0; object-fit: cover; }
+.case-cover-image { height: clamp(17rem, 46vw, 42rem); }
+.case-cover-image img { object-position: center 47%; }
 
 .back-link {
   display: inline-flex;
@@ -963,18 +1029,44 @@ h1 {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(root) { animation: page-leave 280ms ease-out both; }
-  ::view-transition-new(root) { animation: page-arrive 560ms var(--ease-out) both; }
+  ::view-transition-old(root) { animation: page-leave 210ms ease-in both; }
+  ::view-transition-new(root) { animation: page-arrive 510ms var(--ease-out) 90ms both; }
+  ::view-transition-group(project-cover) {
+    z-index: 2;
+    animation-duration: 750ms;
+    animation-timing-function: var(--ease-out);
+  }
+  ::view-transition-old(project-cover), ::view-transition-new(project-cover) { object-fit: cover; }
 
-  @keyframes page-leave { to { opacity: .25; } }
+  .case-cover, .case-cover-transition { view-transition-name: project-cover; }
+
+  @keyframes page-leave { to { opacity: 0; } }
 
   @keyframes page-arrive {
-    from { clip-path: inset(10% 0 0); transform: translateY(.85rem); opacity: .4; }
+    from { clip-path: inset(10% 0 0); transform: translateY(.85rem); opacity: 0; }
     to { clip-path: inset(0); transform: none; opacity: 1; }
   }
 
-  .showcase-cinis .showcase-art {
-    animation: stage-enter 820ms var(--ease-out) both;
+  .showcase-copy h2 > span { overflow: hidden; padding-block: .045em .1em; }
+
+  .showcase:has(#showcase-cinis:checked) .showcase-cinis .showcase-image,
+  .showcase:has(#showcase-movie:checked) .showcase-movie .showcase-image {
+    animation: stage-enter 950ms var(--ease-out) var(--entrance-delay, 0ms) both;
+  }
+
+  .showcase:has(#showcase-cinis:checked) .showcase-cinis h2 b,
+  .showcase:has(#showcase-movie:checked) .showcase-movie h2 b {
+    animation: title-reveal 740ms var(--ease-out) 100ms both;
+  }
+
+  .showcase:has(input:checked) .showcase-copy h2 span + span b { animation-delay: 185ms; }
+  .showcase-image-left { --entrance-delay: 100ms; }
+  .showcase-image-right { --entrance-delay: 165ms; }
+
+  .project-list .project-media {
+    transform: perspective(48rem) rotateY(var(--rail-turn, 0deg)) rotate(var(--rail-roll, 0deg))
+      scale(var(--rail-scale, 1));
+    transition: transform 260ms var(--ease-out);
   }
 
   .showcase-copy {
@@ -983,7 +1075,7 @@ h1 {
   }
 
   .showcase-scene .showcase-art { transition: scale 680ms var(--ease-out); }
-  .showcase-scene { scale: .985; transition: opacity 420ms var(--ease-out), visibility 420ms, scale 620ms var(--ease-out); }
+  .showcase-scene { scale: .985; transition: opacity 420ms var(--ease-out), scale 620ms var(--ease-out); }
   .showcase:has(#showcase-cinis:checked) .showcase-cinis,
   .showcase:has(#showcase-movie:checked) .showcase-movie { scale: 1; }
   .showcase:has(#showcase-cinis:checked) .showcase-cinis .showcase-copy,
@@ -996,13 +1088,15 @@ h1 {
   .project-entered { animation: project-enter 520ms var(--ease-out) both; }
 
   @keyframes stage-enter {
-    from { opacity: .2; clip-path: inset(10% 0 0); translate: 0 1.75rem; }
-    to { opacity: 1; clip-path: inset(0); translate: none; }
+    from { opacity: 0; rotate: y 78deg; translate: 3rem 1.5rem; }
+    to { opacity: 1; rotate: y 0deg; translate: none; }
   }
 
+  @keyframes title-reveal { from { translate: 0 110%; } }
+
   @keyframes intro-enter {
-    from { opacity: .55; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { clip-path: inset(0 0 90%); opacity: .55; transform: translateY(12px); }
+    to { clip-path: inset(0); opacity: 1; transform: none; }
   }
 
   @keyframes project-enter {
@@ -1056,6 +1150,7 @@ h1 {
   }
 
   .showcase-image { inline-size: clamp(7.3rem, 35vw, 12rem); }
+  .showcase-image-main { --depth: 1.4rem; }
   .showcase-copy { grid-area: 2 / 1; padding: 1.2rem 1.3rem 1.45rem; }
   .showcase-copy h2 { font-size: clamp(2.45rem, 8vw, 3.65rem); }
   .project-list { grid-auto-columns: 83%; }
@@ -1083,5 +1178,6 @@ h1 {
   :root { scroll-behavior: auto; }
   .project-media img, .scene img, .image-viewer { transition: none; }
   .showcase-scene, .showcase-controls label { transition: none; }
+  .project-list .project-media::after { transition: none; }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0s; }
 }
