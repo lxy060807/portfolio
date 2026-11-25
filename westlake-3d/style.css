@@ -201,9 +201,27 @@
 .dining-facts dt, .dining-source-note { color:var(--muted); font-size:.8125rem; }
 .dining-facts dd { margin:3px 0 0; font-size:.9375rem; }
 .dining-source-note { margin:0 0 12px; }
-#stage[data-dining-labels] .dining-marker { background:#faf0dc; border-color:#bc9565; color:#59391f; }
+[data-dining-tier="0"] { --dining-fill:#e4f2df; --dining-ink:#21482d; --dining-edge:#5a8c62; }
+[data-dining-tier="1"] { --dining-fill:#e4effb; --dining-ink:#274269; --dining-edge:#5f83b4; }
+[data-dining-tier="2"] { --dining-fill:#fbefdb; --dining-ink:#5a391d; --dining-edge:#a77537; }
+[data-dining-tier="3"] { --dining-fill:#f2e7f5; --dining-ink:#512e59; --dining-edge:#986ca1; }
+[data-lighting="night"] [data-dining-tier="0"] { --dining-fill:#233b2c; --dining-ink:#d3efcd; --dining-edge:#7aa987; }
+[data-lighting="night"] [data-dining-tier="1"] { --dining-fill:#243953; --dining-ink:#d1e5ff; --dining-edge:#86a9d9; }
+[data-lighting="night"] [data-dining-tier="2"] { --dining-fill:#483323; --dining-ink:#ffe6bf; --dining-edge:#ca9a5b; }
+[data-lighting="night"] [data-dining-tier="3"] { --dining-fill:#44304c; --dining-ink:#f1d9f6; --dining-edge:#bf93c6; }
+.dining-price-key { display:flex; flex-wrap:wrap; gap:4px 6px; padding:0; margin:6px 0 0; list-style:none; }
+.dining-price-key li {
+  padding:2px 5px; border:1px solid var(--dining-edge); border-radius:5px;
+  background:var(--dining-fill); color:var(--dining-ink); font-size:.75rem; white-space:nowrap;
+}
+#stage[data-dining-labels] .dining-marker { background:var(--dining-fill); border-color:var(--dining-edge); color:var(--dining-ink); }
 #stage[data-dining-labels] .dining-marker:hover, #stage[data-dining-labels] .dining-marker.selected,
-#stage[data-dining-labels] .dining-marker[aria-pressed="true"] { background:#714524; color:#fff; }
+#stage[data-dining-labels] .dining-marker[aria-pressed="true"] { background:var(--dining-ink); color:var(--dining-fill); }
+#stage[data-dining-labels] .dining-marker.place-dot { width:44px; border-radius:5px; }
+#stage[data-dining-labels] .dining-marker:is(.place-dot,.trip-choice-dot)::before {
+  content:attr(data-dining-price); position:static; display:grid; place-items:center; height:100%;
+  margin:0; background:none; border:0; box-shadow:none; font-size:11px; font-weight:600;
+}
 .map-label.place-dot {
   width: 26px;
   height: 24px;
@@ -229,9 +247,6 @@
 [data-lighting="night"] #place-index-empty, [data-lighting="night"] #place-query::placeholder { color: #b6caca; }
 [data-lighting="night"] .place-result:hover, [data-lighting="night"] .place-result:focus-visible { background: #344f59; }
 [data-lighting="night"] #place-budget, [data-lighting="night"] #trip-meal-duration select { color-scheme:dark; }
-[data-lighting="night"] #stage[data-dining-labels] .dining-marker { background:#523a26; color:#ffe6bf; border-color:#a97d54; }
-[data-lighting="night"] #stage[data-dining-labels] .dining-marker:hover, [data-lighting="night"] #stage[data-dining-labels] .dining-marker.selected,
-[data-lighting="night"] #stage[data-dining-labels] .dining-marker[aria-pressed="true"] { background:#f0c58f; color:#352416; }
 
 :root[data-lighting="night"] { --surface: #192835; --line: #3d505e; --muted: #aabfc9; color: #e6eeed; background: #152330; }
 [data-lighting="night"] header, [data-lighting="night"] aside { color: #e6eeed; }

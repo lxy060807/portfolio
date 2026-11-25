@@ -48,10 +48,26 @@ const waterfrontViews = new Map();
 let waterfrontFocus = null;
 let followTowerPresetOnResize = false;
 let tripBounds = null, tripPins = [];
+const diningPriceBands = [
+  {max:50, label:'¥50 以内'},
+  {max:100, label:'¥51–100'},
+  {max:150, label:'¥101–150'},
+  {max:Infinity, label:'¥151 起'}
+];
 const atlasUI = createAtlasUI({
   onPlace: setActive, onTrail: showTrail, onClose: closeDetails, onDetail: focusWaterfront, onTrip: openTrip
 });
 const tripPlanner = createTripPlanner(places, () => loadData('trip-network.json'), drawTrip, fitTrip, showMapStops);
+
+function markDiningPrice(element, price) {
+  element.classList.add('dining-marker');
+  element.dataset.diningPrice = '¥' + price;
+  element.dataset.diningTier = diningPriceBands.findIndex(band => price <= band.max);
+}
+
+function mapStopName(place) {
+  return place.dining ? place.name + '，参考人均 ' + place.dining.price + ' 元' : place.name;
+}
 
 function showMapStops(picking, points, multiSelect) {
   stage.toggleAttribute('data-trip-picking', picking);
@@ -64,7 +80,8 @@ function showMapStops(picking, points, multiSelect) {
     if (!tripStop) continue;
     const mark = marks.get(tripStop.id)?.join('·') ?? '';
     el.dataset.mark = mark;
-    el.setAttribute('aria-label', !multiSelect && mark ? tripStop.name + '，已选 ' + mark : tripStop.name);
+    const name = mapStopName(tripStop);
+    el.setAttribute('aria-label', !multiSelect && mark ? name + '，已选 ' + mark : name);
     if (multiSelect) el.setAttribute('aria-pressed', String(Boolean(mark)));
     else el.removeAttribute('aria-pressed');
   }
@@ -153,7 +170,8 @@ function drawTrip(result, draft = []) {
     if (!stage.hasAttribute('data-trip-picking')) {
       const mapStops = new Map();
       for (const {stop, mark} of draft) {
-        if (!mapStops.has(stop.id)) mapStops.set(stop.id, {coordinates:stop.c,names:[stop.name],labels:[],meal:Boolean(stop.dining)});
+        if (!mapStops.has(stop.id)) mapStops.set(stop.id, {coordinates:stop.c,names:[mapStopName(stop)],labels:[],prices:new Set()});
+        if (stop.dining) mapStops.get(stop.id).prices.add(stop.dining.price);
         mapStops.get(stop.id).labels.push(mark);
       }
       addTripPins(mapStops);
@@ -175,11 +193,11 @@ function drawTrip(result, draft = []) {
   }
   const mapStops = new Map();
   for (const [i,point] of result.routePoints.entries()) {
-    if (!mapStops.has(point.node)) mapStops.set(point.node, { coordinates:point.coordinates, names:[], labels:[] });
+    if (!mapStops.has(point.node)) mapStops.set(point.node, { coordinates:point.coordinates, names:[], labels:[], prices:new Set() });
     const marker = mapStops.get(point.node);
-    marker.names.push(point.stop.name);
+    marker.names.push(mapStopName(point.stop));
     marker.labels.push(i === 0 ? '起' : i === result.routePoints.length - 1 ? '终' : String(i));
-    marker.meal ||= Boolean(point.stop.dining);
+    if (point.stop.dining) marker.prices.add(point.stop.dining.price);
   }
   addTripPins(mapStops);
   stage.dataset.trip = 'active';
@@ -187,10 +205,10 @@ function drawTrip(result, draft = []) {
 }
 
 function addTripPins(mapStops) {
-  for (const {coordinates,names,labels:marks,meal} of mapStops.values()) {
+  for (const {coordinates,names,labels:marks,prices} of mapStops.values()) {
     const element = document.createElement('span');
     element.className = 'map-label trip-pin';
-    if (meal) element.classList.add('dining-marker');
+    if (prices.size === 1) markDiningPrice(element, prices.values().next().value);
     element.textContent = marks.length <= 2 ? marks.join('·') : marks[0] + '＋' + (marks.length - 1);
     element.title = [...new Set(names)].join('、');
     const [x,z] = project(coordinates);
@@ -418,10 +436,12 @@ function build(d, footprintData){
    if (index >= 0) {
      el.type = 'button';
      el.dataset.place = places[index].id;
-     el.title = places[index].name;
-     if (places[index].dining) {
-       el.classList.add('dining-marker');
-       el.setAttribute('aria-label', places[index].name);
+     const place = places[index];
+     el.title = mapStopName(place);
+     if (place.dining) {
+       markDiningPrice(el, place.dining.price);
+       el.textContent += ' · ' + el.dataset.diningPrice;
+       el.setAttribute('aria-label', el.title);
      }
      el.addEventListener('click', () => setActive(index, el));
    }
@@ -437,9 +457,13 @@ function build(d, footprintData){
    const el = document.createElement('button');
    el.type = 'button';
    el.className = 'map-label trip-choice';
-   if (stop.dining) el.classList.add('dining-marker');
    el.dataset.tripStop = stop.id;
    el.textContent = stop.dining?.label ?? stop.name;
+   if (stop.dining) {
+     markDiningPrice(el, stop.dining.price);
+     el.textContent += ' · ' + el.dataset.diningPrice;
+     el.title = mapStopName(stop);
+   }
    el.hidden = true;
    el.addEventListener('click', () => tripPlanner.pick(stop.id));
    $('#labels').append(el);
@@ -656,7 +680,7 @@ function updateLabels() {
         && !overlapsPanel && !overlapsControls && !overlapsLabel;
     };
     const asDot = (label.routeId || label.tripStop || (expanded && label.i !== selected)) && !fits(expandedClearance, y);
-    const clearance = asDot ? (picking ? 22 : 13) : expandedClearance;
+    const clearance = asDot ? (picking || label.el.dataset.diningPrice ? 22 : 13) : expandedClearance;
     if ((label.routeId || label.tripStop) && asDot && !fits(clearance, y)) {
       for (const offset of [16, 32, 48, 64]) {
         if (fits(clearance, anchorY - offset)) {
@@ -730,11 +754,21 @@ for(const [id,names]of[['buildings',['Buildings','Landmarks']],['trees',['Trees'
 $('#layer-labels').onchange=e=>$('#labels').style.visibility=e.target.checked?'visible':'hidden';
 const diningLayer = $('#layer-dining');
 const tripDiningButton = $('#trip-map-dining');
+const diningKeys = [...document.querySelectorAll('.dining-price-key')];
+for (const key of diningKeys) {
+  diningPriceBands.forEach((band, tier) => {
+    const item = document.createElement('li');
+    item.dataset.diningTier = tier;
+    item.textContent = band.label;
+    key.append(item);
+  });
+}
 const diningPreference = 'westlake-dining-labels';
 function setDiningLabels(visible) {
   stage.toggleAttribute('data-dining-labels', visible);
   diningLayer.checked = visible;
   tripDiningButton.setAttribute('aria-pressed', String(visible));
+  for (const key of diningKeys) key.hidden = !visible;
 }
 try { setDiningLabels(localStorage.getItem(diningPreference) === 'true'); } catch { setDiningLabels(false); }
 function changeDiningLabels(visible) {
