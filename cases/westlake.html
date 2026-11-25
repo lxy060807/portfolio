@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="西湖空间图志是一份可交互的三维地图原型，支持地图探索、景点查看、路线聚焦与昼夜切换。">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#faf7f2">
   <title>西湖 · 空间图志 · LIANG 作品集</title>
   <link rel="stylesheet" href="../style.css">
+  <script defer src="../interactions.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -40,10 +41,14 @@
           <label for="scene-day">白天</label>
           <input class="visually-hidden" type="radio" name="scene-light" id="scene-night">
           <label for="scene-night">夜景</label>
+          <input class="visually-hidden" type="radio" name="scene-light" id="scene-split" hidden>
+          <label for="scene-split" hidden>拖动对比</label>
         </fieldset>
         <figure class="scene">
           <img class="scene-day" src="../assets/westlake-day.jpg" alt="日光下的西湖三维模型，湖岸、堤道和街区清晰可见" width="1440" height="900">
           <img class="scene-night" src="../assets/westlake-night.jpg" alt="夜间的同一西湖场景，湖岸和周边街区由灯光勾勒" width="1440" height="900">
+          <input class="scene-range" type="range" min="0" max="100" value="50" aria-label="调整画面中的白天与夜景比例" hidden>
+          <span class="scene-divider" aria-hidden="true"><span></span></span>
         </figure>
       </div>
     </section>

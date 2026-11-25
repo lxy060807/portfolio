@@ -25,6 +25,43 @@ function enableFlowButtons() {
   }
 }
 
+function enableSceneComparison() {
+  const scene = document.querySelector(".scene");
+  const slider = scene?.querySelector(".scene-range");
+  const splitMode = document.getElementById("scene-split");
+  if (!slider || !splitMode) return;
+
+  function updateSplit() {
+    const day = slider.valueAsNumber;
+    scene.style.setProperty("--split", `${day}%`);
+    slider.setAttribute("aria-valuetext", `白天 ${day}%，夜景 ${100 - day}%`);
+  }
+
+  function dragSplit(event) {
+    const { left, width } = slider.getBoundingClientRect();
+    const position = Math.round((event.clientX - left) / width * 100);
+    slider.value = Math.min(100, Math.max(0, position));
+    updateSplit();
+  }
+
+  document.querySelector('label[for="scene-split"]').hidden = false;
+  splitMode.hidden = false;
+  slider.hidden = false;
+  if (!document.getElementById("scene-night").checked) splitMode.checked = true;
+  slider.addEventListener("input", updateSplit);
+  slider.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    slider.focus({ preventScroll: true });
+    slider.setPointerCapture(event.pointerId);
+    dragSplit(event);
+  });
+  slider.addEventListener("pointermove", (event) => {
+    if (slider.hasPointerCapture(event.pointerId)) dragSplit(event);
+  });
+  updateSplit();
+}
+
 function enableImageViewer() {
   const sections = [...document.querySelectorAll(".case-demo")];
   const gallerySelector = ".case-gallery img, .case-board img, .case-banner img";
@@ -49,6 +86,7 @@ function enableImageViewer() {
   `;
   document.body.append(dialog);
 
+  const stage = dialog.querySelector(".image-viewer-stage");
   const preview = dialog.querySelector("img");
   const caption = dialog.querySelector(".image-viewer-caption");
   const controls = dialog.querySelector(".image-viewer-controls");
@@ -56,7 +94,7 @@ function enableImageViewer() {
   let activeIndex = 0;
   let trigger;
 
-  function showImage(index, animate = false) {
+  function showImage(index, direction = 0) {
     activeIndex = (index + images.length) % images.length;
     const image = images[activeIndex];
     const figureCaption = image.closest("figure")?.querySelector("figcaption")?.textContent.trim();
@@ -65,10 +103,17 @@ function enableImageViewer() {
     caption.textContent = `${activeIndex + 1} / ${images.length} · ${figureCaption || image.alt}`;
     controls.hidden = images.length < 2;
 
-    if (animate && !reducedMotion.matches && typeof preview.animate === "function") {
+    if (direction && !reducedMotion.matches && typeof preview.animate === "function") {
       preview.getAnimations().forEach((animation) => animation.cancel());
-      preview.animate([{ opacity: .55 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+      preview.animate(
+        [{ opacity: .55, transform: `translateX(${direction * 10}px)` }, { opacity: 1, transform: "none" }],
+        { duration: 150, easing: "ease-out" }
+      );
     }
+  }
+
+  function moveViewer(direction) {
+    if (images.length > 1) showImage(activeIndex + direction, direction);
   }
 
   for (const section of sections) {
@@ -96,19 +141,36 @@ function enableImageViewer() {
   }
 
   dialog.querySelector("[data-viewer-close]").addEventListener("click", () => dialog.close());
-  dialog.querySelector("[data-viewer-previous]").addEventListener("click", () => showImage(activeIndex - 1, true));
-  dialog.querySelector("[data-viewer-next]").addEventListener("click", () => showImage(activeIndex + 1, true));
+  dialog.querySelector("[data-viewer-previous]").addEventListener("click", () => moveViewer(-1));
+  dialog.querySelector("[data-viewer-next]").addEventListener("click", () => moveViewer(1));
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
   dialog.addEventListener("keydown", (event) => {
     if (images.length < 2 || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
     event.preventDefault();
-    showImage(activeIndex + (event.key === "ArrowRight" ? 1 : -1), true);
+    moveViewer(event.key === "ArrowRight" ? 1 : -1);
   });
   dialog.addEventListener("close", () => trigger?.focus({ preventScroll: true }));
+
+  let swipeStart;
+  stage.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.pointerType !== "touch") return;
+    swipeStart = { x: event.clientX, y: event.clientY };
+  });
+  stage.addEventListener("pointerup", (event) => {
+    if (!event.isPrimary || !swipeStart) return;
+    const deltaX = event.clientX - swipeStart.x;
+    const deltaY = event.clientY - swipeStart.y;
+    swipeStart = undefined;
+    if (Math.abs(deltaX) >= 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35) {
+      moveViewer(deltaX < 0 ? 1 : -1);
+    }
+  });
+  stage.addEventListener("pointercancel", () => { swipeStart = undefined; });
 }
 
 revealProjects();
 enableFlowButtons();
+enableSceneComparison();
 enableImageViewer();
