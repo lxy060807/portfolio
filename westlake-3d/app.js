@@ -609,6 +609,7 @@ function updateLabels() {
   const trailVisible = groups.HikingTrail.visible;
   const night = document.documentElement.dataset.lighting === 'night';
   const picking = stage.hasAttribute('data-trip-picking');
+  const showDining = stage.hasAttribute('data-dining-labels');
   const obstacleRects = picking || (night && trailVisible) ? routeObstacles.map(element => element.getBoundingClientRect()) : [];
   const stageRect = obstacleRects.length ? stage.getBoundingClientRect() : null;
   const detailPanel = $('#atlas-details');
@@ -624,6 +625,10 @@ function updateLabels() {
   const ordered = labels.slice().sort((a, b) => priority(b) - priority(a));
   for (const label of ordered) {
     if (picking !== Boolean(label.tripStop)) { label.el.hidden = true; continue; }
+    if (!showDining && (label.tripStop?.dining || places[label.i]?.dining)) {
+      label.el.hidden = true;
+      continue;
+    }
     const place = places[selected]?.id;
     const showWaterfront = label.waterfront && detail && place === label.place && (
       place === 'moon' ? groups.Landmarks.visible && waterfrontFocus?.id === 'all' : groups.Roads.visible && !waterfrontFocus);
@@ -723,6 +728,21 @@ $('#rotate').onclick=()=>{flight=null;controls.autoRotate=!controls.autoRotate;$
 $('#capture').onclick=()=>{renderer.render(scene,camera);const a=document.createElement('a');a.download='西湖空间图志.png';a.href=canvas.toDataURL('image/png');a.click()};
 for(const [id,names]of[['buildings',['Buildings','Landmarks']],['trees',['Trees']],['roads',['Roads']]])$('#layer-'+id).onchange=e=>names.forEach(n=>groups[n].visible=e.target.checked);
 $('#layer-labels').onchange=e=>$('#labels').style.visibility=e.target.checked?'visible':'hidden';
+const diningLayer = $('#layer-dining');
+const tripDiningButton = $('#trip-map-dining');
+const diningPreference = 'westlake-dining-labels';
+function setDiningLabels(visible) {
+  stage.toggleAttribute('data-dining-labels', visible);
+  diningLayer.checked = visible;
+  tripDiningButton.setAttribute('aria-pressed', String(visible));
+}
+try { setDiningLabels(localStorage.getItem(diningPreference) === 'true'); } catch { setDiningLabels(false); }
+function changeDiningLabels(visible) {
+  setDiningLabels(visible);
+  try { localStorage.setItem(diningPreference, String(visible)); } catch {}
+}
+diningLayer.addEventListener('change', () => changeDiningLabels(diningLayer.checked));
+tripDiningButton.addEventListener('click', () => changeDiningLabels(!diningLayer.checked));
 const layerButton = $('#mobile-layers');
 const layerPanel = $('#spatial-layers');
 function closeMobileLayers() {

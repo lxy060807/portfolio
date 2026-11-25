@@ -29,7 +29,7 @@
 <button id="trip-open" class="trip-open" type="button" aria-expanded="false" aria-controls="atlas-details"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8"/></svg>路线规划</button>
 <button id="route-open" class="route-open" aria-expanded="false" aria-controls="atlas-details"><span class="route-symbol" aria-hidden="true"></span><span>宝石山登山入口 <small id="entrance-count"></small></span></button>
 <button id="mobile-layers" class="surface" aria-expanded="false" aria-controls="spatial-layers">图层</button>
-<section id="spatial-layers" class="layers" aria-labelledby="layer-heading"><h2 id="layer-heading">空间图层</h2><label><span>建筑与地标</span><input type="checkbox" id="layer-buildings" checked></label><label><span>林木与绿地</span><input type="checkbox" id="layer-trees" checked></label><label><span>道路与堤桥</span><input type="checkbox" id="layer-roads" checked></label><label><span>地名标注</span><input type="checkbox" id="layer-labels" checked></label></section>
+<section id="spatial-layers" class="layers" aria-labelledby="layer-heading"><h2 id="layer-heading">空间图层</h2><label><span>建筑与地标</span><input type="checkbox" id="layer-buildings" checked></label><label><span>林木与绿地</span><input type="checkbox" id="layer-trees" checked></label><label><span>道路与堤桥</span><input type="checkbox" id="layer-roads" checked></label><label><span>地名标注</span><input type="checkbox" id="layer-labels" checked></label><label><span>餐厅标注</span><input type="checkbox" id="layer-dining"></label></section>
 
 </aside>
 <section id="stage" aria-label="西湖三维场景">
@@ -153,6 +153,7 @@
       </div>
       <div class="trip-map-feedback">
         <p id="trip-map-hint" role="status"></p>
+        <button id="trip-map-dining" type="button" aria-pressed="false">餐厅标注</button>
         <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
     </div>

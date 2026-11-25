@@ -252,6 +252,87 @@ const restaurants = [
       label: '苏面坊', cuisine: '苏式面点', price: 128, rating: 4.8, reviews: 5,
       address: '杭州市西湖区曙光路120号1幢杭州黄龙饭店南大堂A-2区域', hours: '10:00–14:30、17:00–21:00'
     }
+  },
+  {
+    id: 'dining-pan', name: '泮芳春煎饺（中山南路店）', sector: '中山南路 · 鼓楼', region: '吴山与清河坊',
+    c: [120.1663757, 30.2395634], page: '14/148507501',
+    summary: '中山南路的煎饺店，菜单有鲜肉煎饺和小馄饨。',
+    dining: {
+      label: '泮芳春煎饺', cuisine: '煎饺与点心', price: 17, rating: 4, reviews: 5,
+      address: '中山南路479号(中河中路与望江路交口西南角100米)', hours: '06:00–20:00'
+    }
+  },
+  {
+    id: 'dining-juying', name: '菊英面店（中山南路店）', sector: '中山南路 · 十五奎巷', region: '吴山与清河坊',
+    c: [120.1662243, 30.2370196], page: '2026903/5141521',
+    summary: '中山南路的杭式面馆，片儿川是常见点单。',
+    dining: {
+      label: '菊英面店', cuisine: '片儿川', price: 31, rating: 4.1, reviews: 86,
+      address: '中山南路368号', hours: '08:00–20:00'
+    }
+  },
+  {
+    id: 'dining-baijia', name: '百家鸡味馆（清泰店）', sector: '清泰街 · 定安路', region: '吴山与清河坊',
+    c: [120.1683098, 30.2487147], page: '14/5140626',
+    summary: '清泰街的港式简餐店，供应白斩鸡和叉烧饭。',
+    dining: {
+      label: '百家鸡味馆', cuisine: '白斩鸡与简餐', price: 32, rating: 4, reviews: 306,
+      address: '清泰街571号金泰商务大厦裙楼（中河中路与西湖大道交叉口）', hours: '10:00–22:30'
+    }
+  },
+  {
+    id: 'dining-rongxian', name: '荣鲜面馆（邮电路店）', sector: '邮电路 · 龙翔桥', region: '湖滨与解放路',
+    c: [120.1625326, 30.2541938], page: '14/62572191',
+    summary: '邮电路面馆，菜单有酸菜鱼面。',
+    dining: {
+      label: '荣鲜面馆', cuisine: '酸菜鱼面', price: 32, rating: 4, reviews: 4,
+      address: '邮电路46-3号', hours: '09:00–20:00'
+    }
+  },
+  {
+    id: 'dining-pastry', name: '南宋胡记（西湖旗舰店）', sector: '东坡路 · 湖滨', region: '湖滨与解放路',
+    c: [120.1591813, 30.2550027], page: '2116538/4246746',
+    summary: '湖滨 in77 D 区外围的糕点铺，卖荷花酥等点心。',
+    dining: {
+      label: '南宋胡记', cuisine: '杭式糕点', price: 48, rating: 4.4, reviews: 14,
+      address: '东坡路湖滨in77D区外围1楼(喜茶对面)', hours: '09:30–22:30'
+    }
+  },
+  {
+    id: 'dining-wanghu', name: '望湖小馆（西湖店）', sector: '学士路 · 湖滨', region: '湖滨与解放路',
+    c: [120.1566762, 30.2578751], page: '14/15647967',
+    summary: '学士路的家常菜馆，靠近湖滨步行街。',
+    dining: {
+      label: '望湖小馆', cuisine: '杭帮家常菜', price: 73, rating: 4.6, reviews: 9,
+      address: '学士路91号', hours: '10:30–22:30'
+    }
+  },
+  {
+    id: 'dining-hangsan', name: '杭三姐妹（西湖创始店）', sector: '武林路 · 凤起路', region: '湖滨与解放路',
+    c: [120.1559267, 30.2647689], page: '14/90681064',
+    summary: '凤起路附近的杭帮菜馆，门店在西湖 D11 二楼。',
+    dining: {
+      label: '杭三姐妹', cuisine: '杭帮家常菜', price: 71, rating: 4, reviews: 4,
+      address: '武林路163号西湖D11二楼杭三姐妹26年老底子杭帮菜', hours: '10:30–14:00、16:30–21:00'
+    }
+  },
+  {
+    id: 'dining-huji', name: '胡记·老杭帮（西湖店）', sector: '南山路 · 涌金', region: '南山路与雷峰塔',
+    c: [120.1561822, 30.2499291], page: '14/5147439',
+    summary: '南山路上的杭帮菜馆，靠近大华饭店。',
+    dining: {
+      label: '胡记 · 老杭帮', cuisine: '杭帮家常菜', price: 64, rating: 4, reviews: 40,
+      address: '湖滨街道南山路248，250号(近大华饭店)', hours: '09:00–22:00'
+    }
+  },
+  {
+    id: 'dining-pushu', name: '朴墅（青芝坞店）', sector: '玉古路 · 青芝坞', region: '灵隐、植物园与龙井',
+    c: [120.1187755, 30.2601198], page: '2015145/5546647',
+    summary: '青芝坞的庭院餐厅，可以和植物园安排在同一段行程。',
+    dining: {
+      label: '朴墅 · 青芝坞', cuisine: '杭帮菜', price: 109, rating: 4.5, reviews: 900,
+      address: '玉古路61-1号', hours: '11:00–13:30、16:30–20:30'
+    }
   }
 ];
 
