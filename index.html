@@ -8,6 +8,7 @@
   <title>LIANG 的 UI 与交互设计作品集</title>
   <link rel="stylesheet" href="style.css">
   <script src="cover-transitions.js"></script>
+  <script defer src="reel.js"></script>
   <script defer src="interactions.js"></script>
 </head>
 <body class="portfolio-home">
@@ -32,6 +33,10 @@
           <label for="showcase-cinis">CINIS</label>
           <input class="visually-hidden" type="radio" name="showcase" id="showcase-movie">
           <label for="showcase-movie">盲盒选片</label>
+          <input class="visually-hidden" type="radio" name="showcase" id="showcase-peacock">
+          <label for="showcase-peacock">孔雀神记</label>
+          <input class="visually-hidden" type="radio" name="showcase" id="showcase-chair">
+          <label for="showcase-chair">电竞椅</label>
         </fieldset>
         <div class="showcase-scenes">
           <article class="showcase-scene showcase-cinis" aria-labelledby="showcase-cinis-title">
@@ -50,9 +55,26 @@
               <a class="showcase-action" href="cases/movie-picker.html">查看盲盒选片案例</a>
             </div>
           </article>
-          <div class="showcase-art">
+          <article class="showcase-scene showcase-peacock" aria-labelledby="showcase-peacock-title">
+            <div class="showcase-copy">
+              <p class="showcase-type">文创设计、桌游</p>
+              <h2 id="showcase-peacock-title"><span><b>孔雀神记</b></span><span><b>斗转轮盘</b></span></h2>
+              <p>以云南为主题，把孔雀羽纹与雨林配色延展到棋盘、包装与角色。</p>
+              <a class="showcase-action" href="cases/peacock.html">查看孔雀神记案例</a>
+            </div>
+          </article>
+          <article class="showcase-scene showcase-chair" aria-labelledby="showcase-chair-title">
+            <div class="showcase-copy">
+              <p class="showcase-type">工业设计、座椅</p>
+              <h2 id="showcase-chair-title"><span><b>电竞椅设计</b></span></h2>
+              <p>从多视角、配色和使用场景看高背座椅的造型与支撑。</p>
+              <a class="showcase-action" href="cases/gaming-chair.html">查看电竞椅案例</a>
+            </div>
+          </article>
+          <div class="showcase-art" id="featured-reel">
             <a class="showcase-disc disc-cinis" href="cases/cinis.html" data-showcase-disc="showcase-cinis" aria-label="查看 CINIS 自律打卡案例">
               <span class="disc-motion" aria-hidden="true">
+                <span class="disc-reverse"></span>
                 <span class="disc-face">
                   <img src="assets/cinis/character.png" alt="" width="533" height="1155" fetchpriority="high">
                   <span class="disc-inscription" lang="en">CINIS</span>
@@ -62,6 +84,7 @@
             </a>
             <a class="showcase-disc disc-movie" href="cases/movie-picker.html" data-showcase-disc="showcase-movie" aria-label="查看盲盒选片案例">
               <span class="disc-motion" aria-hidden="true">
+                <span class="disc-reverse"></span>
                 <span class="disc-face">
                   <img src="assets/movie-picker/reveal.png" alt="" width="750" height="1624">
                   <span class="disc-inscription">盲盒选片</span>
@@ -69,9 +92,36 @@
                 <span class="disc-hub"></span>
               </span>
             </a>
+            <a class="showcase-disc disc-peacock" href="cases/peacock.html" data-showcase-disc="showcase-peacock" aria-label="查看孔雀神记案例">
+              <span class="disc-motion" aria-hidden="true">
+                <span class="disc-reverse"></span>
+                <span class="disc-face">
+                  <img src="assets/peacock/kit.jpg" alt="" width="2000" height="2000">
+                  <span class="disc-inscription">孔雀神记</span>
+                </span>
+                <span class="disc-hub"></span>
+              </span>
+            </a>
+            <a class="showcase-disc disc-chair" href="cases/gaming-chair.html" data-showcase-disc="showcase-chair" aria-label="查看电竞椅案例">
+              <span class="disc-motion" aria-hidden="true">
+                <span class="disc-reverse"></span>
+                <span class="disc-face">
+                  <img src="assets/chair/desk.png" alt="" width="392" height="496">
+                  <span class="disc-inscription">电竞椅</span>
+                </span>
+                <span class="disc-hub"></span>
+              </span>
+            </a>
           </div>
         </div>
-        <a class="showcase-all" href="#work">查看全部作品</a>
+        <div class="showcase-toolbar">
+          <a class="showcase-all" href="#work">查看全部作品</a>
+          <div class="reel-controls" role="group" aria-label="浏览首屏作品" hidden>
+            <button type="button" data-reel-step="-1" aria-controls="featured-reel" aria-label="上一件首屏作品">←</button>
+            <span class="reel-index" aria-hidden="true"><span data-reel-index>01</span> / 04</span>
+            <button type="button" data-reel-step="1" aria-controls="featured-reel" aria-label="下一件首屏作品">→</button>
+          </div>
+        </div>
       </div>
     </section>
 
