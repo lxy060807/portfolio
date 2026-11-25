@@ -113,6 +113,7 @@ function focusWaterfront(id) {
 function flyToPlace(i) {
   if (!loaded) return;
   if (i === -1) { showTrail(activeTrail); return; }
+  setPerspective();
   const place = places[i];
   if (i === 3 && !waterfrontFocus) { focusWaterfront('all'); return; }
   const view = waterfrontFocus;
@@ -125,7 +126,6 @@ function flyToPlace(i) {
     const target = new THREE.Vector3(x, view?.y ?? terrainAt(x, z), z);
     if (followTowerPresetOnResize) {
       fly(fitTowerGroup(target, view.towers), target);
-      setPerspective();
       return;
     }
     const mobile = compactLayout.matches;
@@ -135,9 +135,23 @@ function flyToPlace(i) {
     const distance = view ? view.distance * (mobile ? view.mobileFit * panelFit : 1) : place.distance;
     fly(target.clone().add(direction.clone().normalize().multiplyScalar(distance)), target);
   }
-  setPerspective();
 }
-function setPerspective(){for(const [id,v]of[['view-perspective',true],['view-top',false]]){$('#'+id).classList.toggle('active',v);$('#'+id).setAttribute('aria-pressed',String(v))}}
+function setViewMode(mode) {
+  const sky = mode === 'sky';
+  stage.dataset.view = mode;
+  controls.maxPolarAngle = sky ? Math.PI * .64 : Math.PI * .46;
+  lighting.showSky(sky);
+  updateFieldOfView();
+  for (const name of ['perspective', 'top', 'sky']) {
+    const button = $('#view-' + name);
+    button.classList.toggle('active', name === mode);
+    button.setAttribute('aria-pressed', String(name === mode));
+  }
+}
+
+function setPerspective() {
+  setViewMode('perspective');
+}
 function makeGeometry(vertices,indices){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(indices)g.setIndex(indices);g.computeVertexNormals();return g}
 function merged(list,material,name,group){if(!list.length)return;const mixed=list.some(g=>!g.index)&&list.some(g=>g.index);for(const g of list){g.deleteAttribute('uv');g.deleteAttribute('color');if(mixed&&g.index){const n=g.toNonIndexed();g.copy(n);n.dispose()}}const geo=mergeGeometries(list);for(const g of list)g.dispose();return mesh(geo,material,name,group)}
 function compactUntextured(geometry) {
@@ -348,11 +362,17 @@ function resize() {
   if (!width || !height) return;
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  const minimumHorizontalFov = THREE.MathUtils.degToRad(44);
-  const verticalFovForNarrowScreen = 2 * Math.atan(Math.tan(minimumHorizontalFov / 2) / camera.aspect);
-  camera.fov = Math.max(39, THREE.MathUtils.radToDeg(verticalFovForNarrowScreen));
+  updateFieldOfView();
   if (waterfrontFocus?.id === 'all' && followTowerPresetOnResize) flyToPlace(selected);
   else updateInspectionFraming();
+}
+
+function updateFieldOfView() {
+  const minimumHorizontalFov = THREE.MathUtils.degToRad(44);
+  const verticalFovForNarrowScreen = 2 * Math.atan(Math.tan(minimumHorizontalFov / 2) / camera.aspect);
+  const defaultFov = stage.dataset.view === 'sky' ? 76 : 39;
+  camera.fov = Math.max(defaultFov, THREE.MathUtils.radToDeg(verticalFovForNarrowScreen));
+  camera.updateProjectionMatrix();
 }
 
 function fitTowerGroup(target, towers) {
@@ -496,7 +516,6 @@ function updateLabels() {
 
 function animate(now) {
   requestAnimationFrame(animate);
-  lighting.update(now);
   if (flight) {
     const time = Math.min(1, (now - flight.start) / 1100);
     const ease = 1 - Math.pow(1 - time, 4);
@@ -507,6 +526,7 @@ function animate(now) {
   controls.update();
   const near = THREE.MathUtils.clamp(controls.getDistance() * .026, .00015, .008);
   if (camera.near !== near) { camera.near = near; camera.updateProjectionMatrix(); }
+  lighting.update(now, camera);
   renderer.render(scene, camera);
   $('#compass').style.transform = 'rotate(' + (-controls.getAzimuthalAngle() * 180 / Math.PI) + 'deg)';
   updateLabels();
@@ -518,7 +538,17 @@ for (const control of ['view-top', 'north', 'zoom-in', 'zoom-out', 'rotate']) {
 }
 $('#reset').onclick=()=>setActive(0);
 $('#view-perspective').onclick=()=>flyToPlace(selected);
-$('#view-top').onclick=()=>{const target=controls.target.clone(),d=Math.max(controls.getDistance(),waterfrontFocus ? .009 : .5);fly(target.clone().add(new THREE.Vector3(0,d,.0001)),target);$('#view-perspective').classList.remove('active');$('#view-perspective').setAttribute('aria-pressed','false');$('#view-top').classList.add('active');$('#view-top').setAttribute('aria-pressed','true')};
+$('#view-top').onclick = () => {
+  if (stage.dataset.view === 'sky') setActive(0);
+  const target = controls.target.clone(), distance = Math.max(controls.getDistance(), waterfrontFocus ? .009 : .5);
+  setViewMode('top');
+  fly(target.clone().add(new THREE.Vector3(0, distance, .0001)), target);
+};
+$('#view-sky').onclick = () => {
+  setActive(0);
+  setViewMode('sky');
+  fly(new THREE.Vector3(1.13, .123, -.38), new THREE.Vector3(-1.25, .545, -.21));
+};
 $('#north').onclick=()=>{const t=controls.target.clone(),d=controls.getDistance(),a=controls.getPolarAngle();fly(t.clone().add(new THREE.Vector3(0,Math.cos(a)*d,Math.sin(a)*d)),t)};
 function zoom(f){const target=controls.target.clone(),dir=camera.position.clone().sub(target);dir.setLength(THREE.MathUtils.clamp(dir.length()*f,controls.minDistance,controls.maxDistance));fly(target.clone().add(dir),target)}
 $('#zoom-in').onclick = () => zoom(compactLayout.matches ? .84 : .75);
