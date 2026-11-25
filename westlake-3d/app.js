@@ -53,7 +53,7 @@ const atlasUI = createAtlasUI({
 });
 const tripPlanner = createTripPlanner(places, () => loadData('trip-network.json'), drawTrip, fitTrip, showMapStops);
 
-function showMapStops(picking, points) {
+function showMapStops(picking, points, multiSelect) {
   stage.toggleAttribute('data-trip-picking', picking);
   const marks = new Map();
   for (const {stop, mark} of points) {
@@ -64,7 +64,9 @@ function showMapStops(picking, points) {
     if (!tripStop) continue;
     const mark = marks.get(tripStop.id)?.join('·') ?? '';
     el.dataset.mark = mark;
-    el.setAttribute('aria-label', mark ? tripStop.name + '，已选 ' + mark : tripStop.name);
+    el.setAttribute('aria-label', !multiSelect && mark ? tripStop.name + '，已选 ' + mark : tripStop.name);
+    if (multiSelect) el.setAttribute('aria-pressed', String(Boolean(mark)));
+    else el.removeAttribute('aria-pressed');
   }
 }
 

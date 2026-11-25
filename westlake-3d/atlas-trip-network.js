@@ -96,6 +96,63 @@ function largestNetwork(graph, back) {
   return new Set(largest);
 }
 
+function shortestVisitOrder(costs) {
+  const count = costs.length;
+  if (count > 10) {
+    // Compare a route from every possible first stop without building an exponential table.
+    let bestOrder = null, bestCost = Infinity;
+    for (let start = 0; start < count; start++) {
+      const order = [start], remaining = new Set(costs.keys());
+      let total = 0;
+      remaining.delete(start);
+      while (remaining.size) {
+        const row = costs[order.at(-1)];
+        let next = -1, cheapest = Infinity;
+        for (const index of remaining) {
+          if (row[index] < cheapest) { next = index; cheapest = row[index]; }
+        }
+        if (next < 0) break;
+        order.push(next);
+        remaining.delete(next);
+        total += cheapest;
+      }
+      if (!remaining.size && total < bestCost) { bestOrder = order; bestCost = total; }
+    }
+    return bestOrder;
+  }
+
+  // Each state tracks the visited stops and the last stop, with either endpoint free.
+  const masks = 1 << count;
+  const best = new Float64Array(masks * count).fill(Infinity);
+  const previous = new Int8Array(best.length).fill(-1);
+  for (let i = 0; i < count; i++) best[(1 << i) * count + i] = 0;
+  for (let mask = 1; mask < masks - 1; mask++) {
+    for (let last = 0; last < count; last++) {
+      const cost = best[mask * count + last];
+      if (!Number.isFinite(cost)) continue;
+      for (let next = 0; next < count; next++) {
+        const bit = 1 << next;
+        if (mask & bit) continue;
+        const state = (mask | bit) * count + next;
+        const total = cost + costs[last][next];
+        if (total < best[state]) { best[state] = total; previous[state] = last; }
+      }
+    }
+  }
+  let mask = masks - 1, last = 0;
+  const offset = mask * count;
+  for (let i = 1; i < count; i++) if (best[offset + i] < best[offset + last]) last = i;
+  if (!Number.isFinite(best[offset + last])) return null;
+  const order = [];
+  while (last >= 0) {
+    order.push(last);
+    const prior = previous[mask * count + last];
+    mask ^= 1 << last;
+    last = prior;
+  }
+  return order.reverse();
+}
+
 export function createTripNetwork(data) {
   const vertices = data.vertices;
   const walk = vertices.map(() => []), walkBack = vertices.map(() => []);
@@ -124,6 +181,7 @@ export function createTripNetwork(data) {
 
   const usableFoot = largestNetwork(walk, walkBack);
   const usableBike = largestNetwork(bike, bikeBack);
+  const bikeEntries = new Map(), bikeExits = new Map();
   function anchor(stop, incoming, outgoing) {
     let node = -1, gap = 155;
     for (const i of usableFoot) {
@@ -159,13 +217,18 @@ export function createTripNetwork(data) {
       return path ? { legs: [leg(path.edges,'walk')] }
         : { error: '这两个接入点之间没有连续的已知步行道路。请换一处入口。' };
     }
-    const access = search(walk, a.node, i => usableBike.has(i) && bike[i].length, walkCost, 1600);
-    const egress = search(walkBack, b.node, i => usableBike.has(i) && bikeBack[i].length, walkCost, 1600);
+    if (!bikeEntries.has(a.node)) {
+      bikeEntries.set(a.node, search(walk, a.node, i => usableBike.has(i) && bike[i].length, walkCost, 1600));
+    }
+    if (!bikeExits.has(b.node)) {
+      bikeExits.set(b.node, search(walkBack, b.node, i => usableBike.has(i) && bikeBack[i].length, walkCost, 1600));
+    }
+    const access = bikeEntries.get(a.node), egress = bikeExits.get(b.node);
     if (access && egress && access.node !== egress.node) {
       const cycling = search(bike, access.node, i => i === egress.node, bikeCost);
       if (cycling) return { legs: [
         leg(access.edges,'walk'), leg(cycling.edges,'bike'),
-        leg(egress.edges.reverse().map(e=>({...e,from:e.to,to:e.from})),'walk')
+        leg([...egress.edges].reverse().map(e=>({...e,from:e.to,to:e.from})),'walk')
       ].filter(item => item.edges.length) };
     }
     return { error: '未找到两处之间的连续可骑行路段。试试步行，或改选有骑行道路的景点入口。' };
@@ -184,11 +247,45 @@ export function createTripNetwork(data) {
     return walking;
   }
 
+  function segmentCache(mode, allowWalkingFallback) {
+    const savedPaths = new Map();
+    return (a, b) => {
+      const key = a.node + ':' + b.node;
+      if (!savedPaths.has(key)) {
+        let result = mode === 'auto' ? recommendSegment(a, b) : planSegment(a, b, mode);
+        if (result.error && mode === 'bike' && allowWalkingFallback) {
+          const walking = planSegment(a, b, 'walk');
+          if (!walking.error) result = walking;
+        }
+        if (!result.error) {
+          const transferMinutes = result.transferMinutes ?? 0;
+          const minutes = result.legs.reduce((sum, item) => sum + item.minutes, transferMinutes);
+          result = { ...result, minutes, transferMinutes };
+        }
+        savedPaths.set(key, result);
+      }
+      return savedPaths.get(key);
+    };
+  }
+
+  function assembleItinerary(routePoints, between) {
+    const segments = [];
+    for (let i = 1; i < routePoints.length; i++) {
+      const a = routePoints[i - 1], b = routePoints[i];
+      const result = between(a, b);
+      if (result.error) return { error: '第 ' + i + ' 段「' + a.stop.name + ' → ' + b.stop.name + '」：' + result.error };
+      segments.push({ from: a.stop, to: b.stop, ...result });
+    }
+    const legs = segments.flatMap(segment => segment.legs);
+    if (!legs.length) return { error: '这些景点使用同一个道路接入点，步行即可就近查看。' };
+    const gap = routePoints.reduce((max, point) => Math.max(max, point.gap), 0);
+    return { segments, routePoints, legs, gap };
+  }
+
   function planItinerary(stops, mode) {
     if (stops.length < 2) return { error: '请选择起点和终点。' };
     const savedAnchors = new Map();
     const routePoints = [];
-    let gap = 0;
     for (const [i, stop] of stops.entries()) {
       if (stop.id === stops[i - 1]?.id) {
         return { error: '第 ' + i + ' 站和第 ' + (i + 1) + ' 站都是「' + stop.name + '」。请选择另一处或删除重复站。' };
@@ -204,31 +301,40 @@ export function createTripNetwork(data) {
         return { error: '第 ' + (i + 1) + ' 站「' + stop.name + '」附近没有可确认的道路接入点。请改选附近景点或入口。' };
       }
       routePoints.push({ ...point, stop, coordinates: vertices[point.node] });
-      gap = Math.max(gap, point.gap);
     }
 
-    const segments = [], savedPaths = new Map();
-    for (let i = 1; i < routePoints.length; i++) {
-      const a = routePoints[i - 1], b = routePoints[i];
-      const key = a.node + ':' + b.node;
-      if (!savedPaths.has(key)) {
-        const planned = mode === 'auto' ? recommendSegment(a, b) : planSegment(a, b, mode);
-        if (planned.error && mode === 'bike' && stops.length > 2) {
-          const walking = planSegment(a, b, 'walk');
-          savedPaths.set(key, walking.error ? planned : walking);
-        } else {
-          savedPaths.set(key, planned);
+    return assembleItinerary(routePoints, segmentCache(mode, stops.length > 2));
+  }
+
+  async function planVisit(stops, mode, isCurrent = () => true) {
+    const unique = [...new Map(stops.map(stop => [stop.id, stop])).values()]
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (unique.length < 2) return { error: '请至少选择两个想去的景点。' };
+    const routePoints = [];
+    for (const stop of unique) {
+      if (stop.water) return { error: '「' + stop.name + '」位于湖中，需要乘船。请选择可步行或骑行到达的景点。' };
+      const point = anchor(stop, true, true);
+      if (!point) return { error: '「' + stop.name + '」附近没有可确认的道路接入点。请改选附近入口。' };
+      routePoints.push({ ...point, stop, coordinates: vertices[point.node] });
+    }
+    const between = segmentCache(mode, unique.length > 2);
+    const costs = [];
+    let lastYield = performance.now();
+    for (const [i, from] of routePoints.entries()) {
+      const row = [];
+      for (const [j, to] of routePoints.entries()) {
+        row.push(i === j ? Infinity : between(from, to).minutes ?? Infinity);
+        if (performance.now() - lastYield >= 30) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          if (!isCurrent()) return null;
+          lastYield = performance.now();
         }
       }
-      const result = savedPaths.get(key);
-      if (result.error) return { error: '第 ' + i + ' 段「' + a.stop.name + ' → ' + b.stop.name + '」：' + result.error };
-      const transferMinutes = result.transferMinutes ?? 0;
-      const minutes = result.legs.reduce((sum, item) => sum + item.minutes, transferMinutes);
-      segments.push({ from: a.stop, to: b.stop, legs: result.legs, minutes, transferMinutes });
+      costs.push(row);
     }
-    const legs = segments.flatMap(segment=>segment.legs);
-    if (!legs.length) return { error: '这些景点使用同一个道路接入点，步行即可就近查看。' };
-    return { segments, routePoints, legs, gap };
+    const order = shortestVisitOrder(costs);
+    if (!order) return { error: '当前出行方式无法串联所有已选景点。请试试自动推荐或调整景点。' };
+    return assembleItinerary(order.map(index => routePoints[index]), between);
   }
 
   function plan(from, to, mode) {
@@ -236,5 +342,5 @@ export function createTripNetwork(data) {
     return { ...planItinerary([from, to], mode), from, to };
   }
 
-  return { plan, planItinerary };
+  return { plan, planItinerary, planVisit };
 }

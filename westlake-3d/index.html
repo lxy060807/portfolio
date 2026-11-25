@@ -92,11 +92,20 @@
   <article id="trip-panel" class="atlas-content" hidden>
     <h2 id="trip-title" tabindex="-1">景点路线规划</h2>
     <form id="trip-form">
+      <fieldset class="trip-order">
+        <legend>游览顺序</legend>
+        <label><input type="radio" name="order" value="visit" checked>自动排顺序</label>
+        <label><input type="radio" name="order" value="ordered">手动排顺序</label>
+      </fieldset>
       <div class="trip-stop-tools">
         <button id="trip-map-open" type="button">在地图上选</button>
         <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
-      <div class="trip-stops">
+      <div id="trip-visit">
+        <label class="trip-stop-field"><span>加景点</span><select id="trip-visit-add"><option value="">选择想去的景点</option></select></label>
+        <ul id="trip-visit-list" aria-label="已选景点" hidden></ul>
+      </div>
+      <div id="trip-ordered" class="trip-stops" hidden>
         <label class="trip-stop-field"><span>起点</span><select name="start" required><option value="">选起点</option></select></label>
         <ol id="trip-waypoints" aria-label="途经点" hidden></ol>
         <div class="trip-stop-tools">
@@ -114,7 +123,11 @@
       <button type="submit" id="trip-plan">规划路线</button>
     </form>
     <div id="trip-map-picker" hidden>
-      <div class="trip-map-roles" role="group" aria-label="选择站点类型">
+      <div id="trip-map-auto" class="trip-stop-tools" hidden>
+        <button type="button" id="trip-map-back">返回</button>
+        <button type="button" id="trip-map-plan" disabled>规划路线</button>
+      </div>
+      <div id="trip-map-manual" class="trip-map-roles" role="group" aria-label="选择站点类型">
         <button type="button" data-trip-role="start" aria-pressed="false">起点</button>
         <button type="button" data-trip-role="via" aria-pressed="false">途经点</button>
         <button type="button" data-trip-role="finish" aria-pressed="false">终点</button>
@@ -136,6 +149,7 @@
         <button id="trip-fit" type="button">查看全程</button>
         <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
+      <ol id="trip-visit-order" aria-label="推荐游览顺序" hidden></ol>
       <ul id="trip-mode-key" class="trip-mode-key" aria-label="路线颜色" hidden>
         <li class="trip-key-walk">步行</li>
         <li class="trip-key-bike">骑行</li>

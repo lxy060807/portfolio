@@ -22,6 +22,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   const undoClear = document.querySelector('#trip-undo-clear');
   const alternate = document.querySelector('#trip-alternate');
   const modeKey = document.querySelector('#trip-mode-key');
+  const visitAdd = document.querySelector('#trip-visit-add');
+  const visitList = document.querySelector('#trip-visit-list');
+  const mapPlan = document.querySelector('#trip-map-plan');
+  const suggestedOrder = document.querySelector('#trip-visit-order');
   modeKey.style.setProperty('--trip-walk', tripColors.walk);
   modeKey.style.setProperty('--trip-bike', tripColors.bike);
   const roleNames = { start:'起点', via:'途经点', finish:'终点' };
@@ -31,7 +35,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   }
   addStopOptions(start);
   addStopOptions(finish);
+  const chosenPlaces = new Set();
+  for (const stop of stops.values()) if (!stop.water) visitAdd.add(new Option(stop.name, stop.id));
   let network, request = 0, pickRole = null, clearedRoute = null;
+  const isVisit = () => form.elements.order.value === 'visit';
 
   function updateWaypoints() {
     const rows = Array.from(waypoints.children);
@@ -100,6 +107,7 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   }
 
   function draftPoints() {
+    if (isVisit()) return [...chosenPlaces].map(id => ({ stop:stops.get(id), mark:'✓' }));
     const fields = itineraryFields();
     return fields.flatMap((field, index) => {
       const stop = stops.get(field.value);
@@ -114,8 +122,9 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     status.textContent = '';
     clearedRoute = null;
     undoClear.hidden = true;
-    const canClear = Boolean(start.value || finish.value || waypoints.children.length);
+    const canClear = isVisit() ? chosenPlaces.size > 0 : Boolean(start.value || finish.value || waypoints.children.length);
     for (const button of clearButtons) button.disabled = !canClear;
+    mapPlan.disabled = chosenPlaces.size < 2;
     draw(null, showDraft ? draftPoints() : []);
   }
 
@@ -124,31 +133,82 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     picker.hidden = !role;
     picker.closest('#atlas-details').classList.toggle('trip-picking', Boolean(role));
     for (const button of roleButtons) button.setAttribute('aria-pressed', String(button.dataset.tripRole === role));
-    mapHint.textContent = role ? chosen + '点击地图上的景点选择' + roleNames[role] + '。' : '';
-    showMapStops(Boolean(role), draftPoints());
+    document.querySelector('#trip-map-auto').hidden = role !== 'visit';
+    document.querySelector('#trip-map-manual').hidden = role === 'visit';
+    mapHint.textContent = role === 'visit' ? chosen + '已选 ' + chosenPlaces.size + ' 个 · 点景点可选中或移除'
+      : role ? chosen + '点击地图上的景点选择' + roleNames[role] + '。' : '';
+    showMapStops(Boolean(role), draftPoints(), role === 'visit');
     reset();
   }
 
   mapButton.addEventListener('click', () => {
-    setPickRole(!start.value ? 'start' : !finish.value ? 'finish' : 'via');
-    roleButtons.find(button => button.dataset.tripRole === pickRole).focus();
+    setPickRole(isVisit() ? 'visit' : !start.value ? 'start' : !finish.value ? 'finish' : 'via');
+    const focus = pickRole === 'visit' ? document.querySelector('#trip-map-back')
+      : roleButtons.find(button => button.dataset.tripRole === pickRole);
+    focus.focus();
   });
   for (const button of roleButtons) button.addEventListener('click', () => setPickRole(button.dataset.tripRole));
-  document.querySelector('#trip-map-done').addEventListener('click', () => {
+  function exitPicker() {
     setPickRole(null);
     mapButton.focus({preventScroll:true});
+  }
+  document.querySelector('#trip-map-done').addEventListener('click', exitPicker);
+  document.querySelector('#trip-map-back').addEventListener('click', exitPicker);
+  mapPlan.addEventListener('click', () => {
+    setPickRole(null);
+    form.requestSubmit();
   });
+
+  function renderVisitList() {
+    visitList.replaceChildren();
+    for (const id of chosenPlaces) {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.removeStop = id;
+      button.textContent = stops.get(id).name + ' ×';
+      button.setAttribute('aria-label', '移除' + stops.get(id).name);
+      li.append(button);
+      visitList.append(li);
+    }
+    for (const option of visitAdd.options) option.disabled = chosenPlaces.has(option.value);
+    visitAdd.value = '';
+    visitList.hidden = !chosenPlaces.size;
+  }
+  visitList.addEventListener('click', event => {
+    const button = event.target.closest('[data-remove-stop]');
+    if (!button) return;
+    chosenPlaces.delete(button.dataset.removeStop);
+    renderVisitList();
+    reset();
+    visitAdd.focus({preventScroll:true});
+  });
+
+  function setOrderedFields(values) {
+    start.value = values[0] ?? '';
+    finish.value = values.length > 1 ? values.at(-1) : '';
+    waypoints.replaceChildren();
+    for (const value of values.slice(1,-1)) addWaypoint(value);
+    updateWaypoints();
+  }
+
+  function updateOrderMode() {
+    document.querySelector('#trip-visit').hidden = !isVisit();
+    document.querySelector('#trip-ordered').hidden = isVisit();
+    for (const field of itineraryFields()) field.disabled = isVisit();
+  }
+  updateOrderMode();
 
   function clearRoute() {
     const snapshot = {
       values: itineraryFields().map(field => field.value),
+      places: [...chosenPlaces],
       planned: !details.hidden
     };
-    start.value = '';
-    finish.value = '';
-    waypoints.replaceChildren();
+    setOrderedFields([]);
+    chosenPlaces.clear();
+    renderVisitList();
     parts.replaceChildren();
-    updateWaypoints();
     setPickRole(null);
     clearedRoute = snapshot;
     undoClear.hidden = false;
@@ -157,11 +217,11 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   }
   for (const button of clearButtons) button.addEventListener('click', clearRoute);
   undoClear.addEventListener('click', () => {
-    const {values, planned} = clearedRoute;
-    start.value = values[0];
-    finish.value = values.at(-1);
-    for (const value of values.slice(1,-1)) addWaypoint(value);
-    updateWaypoints();
+    const {values, places, planned} = clearedRoute;
+    setOrderedFields(values);
+    for (const id of places) chosenPlaces.add(id);
+    renderVisitList();
+    updateOrderMode();
     reset();
     if (planned) form.requestSubmit();
     else {
@@ -241,8 +301,15 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     details.hidden = false;
     const path = result.routePoints;
     const count = path.length - 2;
-    document.querySelector('#trip-endpoints').textContent = path[0].stop.name + ' → ' + path.at(-1).stop.name
-      + (count ? ' · 途经 ' + count + ' 站' : '');
+    document.querySelector('#trip-endpoints').textContent = isVisit() ? '推荐游览顺序 · ' + path.length + ' 个景点'
+      : path[0].stop.name + ' → ' + path.at(-1).stop.name + (count ? ' · 途经 ' + count + ' 站' : '');
+    suggestedOrder.hidden = !isVisit();
+    suggestedOrder.replaceChildren();
+    if (isVisit()) for (const {stop} of path) {
+      const item = document.createElement('li');
+      item.textContent = stop.name;
+      suggestedOrder.append(item);
+    }
     summary.textContent = (chosenMode === 'auto' ? '自动推荐 · ' : '') + modes.join('＋')
       + ' · ' + amount(total) + ' · 约 ' + Math.max(1, Math.round(minutes)) + ' 分钟';
     alternate.dataset.mode = chosenMode === 'bike' || (chosenMode === 'auto' && hasCycling) ? 'walk' : 'bike';
@@ -267,7 +334,23 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     summary.focus({preventScroll:true});
   }
 
-  form.addEventListener('change', () => reset());
+  form.addEventListener('change', event => {
+    if (event.target === visitAdd && visitAdd.value) {
+      chosenPlaces.add(visitAdd.value);
+      renderVisitList();
+    }
+    if (event.target.name === 'order') {
+      if (isVisit()) {
+        chosenPlaces.clear();
+        for (const field of itineraryFields()) if (field.value) chosenPlaces.add(field.value);
+        renderVisitList();
+      } else {
+        setOrderedFields([...chosenPlaces]);
+      }
+      updateOrderMode();
+    }
+    reset();
+  });
   document.querySelector('#trip-swap').addEventListener('click', () => {
     const fields = itineraryFields(), values = fields.map(field=>field.value).reverse();
     fields.forEach((field,i)=>{field.value = values[i];});
@@ -276,6 +359,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   form.addEventListener('submit', async event => {
     event.preventDefault();
     reset();
+    if (isVisit() && chosenPlaces.size < 2) {
+      status.textContent = '请至少选择两个想去的景点。';
+      return;
+    }
     const current = request;
     status.textContent = '正在规划路线…';
     try {
@@ -285,7 +372,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
       });
       const graph = await network;
       if (request !== current) return;
-      const result = graph.planItinerary(itineraryFields().map(field=>stops.get(field.value)), form.elements.mode.value);
+      const mode = form.elements.mode.value;
+      const result = isVisit() ? await graph.planVisit([...chosenPlaces].map(id => stops.get(id)), mode, () => request === current)
+        : graph.planItinerary(itineraryFields().map(field => stops.get(field.value)), mode);
+      if (request !== current) return;
       if (result.error) status.textContent = result.error;
       else show(result);
     } catch {
@@ -295,7 +385,7 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   fitButton.addEventListener('click', fit);
   document.querySelector('#trip-edit').addEventListener('click', () => {
     reset();
-    start.focus({preventScroll:true});
+    (isVisit() ? mapButton : start).focus({preventScroll:true});
   });
   alternate.addEventListener('click', () => {
     form.elements.mode.value = alternate.dataset.mode;
@@ -303,7 +393,12 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   });
   return {
     open(place) {
-      if (stops.has(place)) finish.value = place;
+      if (stops.has(place)) {
+        if (isVisit()) {
+          chosenPlaces.add(place);
+          renderVisitList();
+        } else finish.value = place;
+      }
       reset();
     },
     close() {
@@ -318,6 +413,13 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
         return;
       }
       const role = pickRole;
+      if (role === 'visit') {
+        const removed = chosenPlaces.delete(place);
+        if (!removed) chosenPlaces.add(place);
+        renderVisitList();
+        setPickRole(role, (removed ? '已移除' : '已选') + '「' + stop.name + '」。');
+        return;
+      }
       if (role === 'via') {
         const empty = [...waypoints.querySelectorAll('select')].find(field => !field.value);
         if (empty) empty.value = place;
