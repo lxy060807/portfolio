@@ -124,12 +124,11 @@ export function createTripNetwork(data) {
 
   const usableFoot = largestNetwork(walk, walkBack);
   const usableBike = largestNetwork(bike, bikeBack);
-  function anchor(stop, outgoing) {
+  function anchor(stop, incoming, outgoing) {
     let node = -1, gap = 155;
-    const graph = outgoing ? walk : walkBack;
     for (const i of usableFoot) {
       const distance = metres(stop.c, vertices[i]);
-      if (distance >= gap || !graph[i].length) continue;
+      if (distance >= gap || (incoming && !walkBack[i].length) || (outgoing && !walk[i].length)) continue;
       node = i;
       gap = distance;
     }
@@ -153,29 +152,74 @@ export function createTripNetwork(data) {
     return { mode, distance, minutes, coordinates, edges };
   }
 
-  function plan(from, to, mode) {
-    if (from.id === to.id) return { error: '起点和终点相同。请选择另一个景点。' };
-    if (from.water || to.water) return { error: '选中的景点在湖中，无法全程步行或骑行到达。请选择岸上景点，船班请查景区公告。' };
-    const a = anchor(from, true), b = anchor(to, false);
-    if (!a || !b) return { error: '这处景点附近暂时没有可确认的步行接入点。可改选附近景点或入口。' };
-    if (a.node === b.node) return { error: '这两处使用同一个道路接入点，步行即可就近查看。' };
-    const result = legs => ({ legs, from, to, gap: Math.max(a.gap, b.gap) });
+  function planSegment(a, b, mode) {
+    if (a.node === b.node) return { legs: [] };
     if (mode === 'walk') {
       const path = search(walk, a.node, i => i === b.node, walkCost);
-      return path ? result([leg(path.edges,'walk')])
+      return path ? { legs: [leg(path.edges,'walk')] }
         : { error: '这两个接入点之间没有连续的已知步行道路。请换一处入口。' };
     }
     const access = search(walk, a.node, i => usableBike.has(i) && bike[i].length, walkCost, 1600);
     const egress = search(walkBack, b.node, i => usableBike.has(i) && bikeBack[i].length, walkCost, 1600);
     if (access && egress && access.node !== egress.node) {
       const cycling = search(bike, access.node, i => i === egress.node, bikeCost);
-      if (cycling) return result([
+      if (cycling) return { legs: [
         leg(access.edges,'walk'), leg(cycling.edges,'bike'),
         leg(egress.edges.reverse().map(e=>({...e,from:e.to,to:e.from})),'walk')
-      ].filter(item => item.edges.length));
+      ].filter(item => item.edges.length) };
     }
     return { error: '未找到两处之间的连续可骑行路段。试试步行，或改选有骑行道路的景点入口。' };
   }
 
-  return { plan };
+  function planItinerary(stops, mode) {
+    if (stops.length < 2) return { error: '请选择起点和终点。' };
+    const savedAnchors = new Map();
+    const routePoints = [];
+    let gap = 0;
+    for (const [i, stop] of stops.entries()) {
+      if (stop.id === stops[i - 1]?.id) {
+        return { error: '第 ' + i + ' 站和第 ' + (i + 1) + ' 站都是「' + stop.name + '」。请选择另一处或删除重复站。' };
+      }
+      if (stop.water) {
+        return { error: '第 ' + (i + 1) + ' 站「' + stop.name + '」在湖中。请改选岸上景点，船班请查景区公告。' };
+      }
+      const arriving = i > 0, leaving = i < stops.length - 1;
+      const key = stop.id + ':' + (arriving ? 'a' : '') + (leaving ? 'l' : '');
+      if (!savedAnchors.has(key)) savedAnchors.set(key, anchor(stop, arriving, leaving));
+      const point = savedAnchors.get(key);
+      if (!point) {
+        return { error: '第 ' + (i + 1) + ' 站「' + stop.name + '」附近没有可确认的道路接入点。请改选附近景点或入口。' };
+      }
+      routePoints.push({ ...point, stop, coordinates: vertices[point.node] });
+      gap = Math.max(gap, point.gap);
+    }
+
+    const segments = [], savedPaths = new Map();
+    for (let i = 1; i < routePoints.length; i++) {
+      const a = routePoints[i - 1], b = routePoints[i];
+      const key = a.node + ':' + b.node;
+      if (!savedPaths.has(key)) {
+        const planned = planSegment(a, b, mode);
+        if (planned.error && mode === 'bike' && stops.length > 2) {
+          const walking = planSegment(a, b, 'walk');
+          savedPaths.set(key, walking.error ? planned : walking);
+        } else {
+          savedPaths.set(key, planned);
+        }
+      }
+      const result = savedPaths.get(key);
+      if (result.error) return { error: '第 ' + i + ' 段「' + a.stop.name + ' → ' + b.stop.name + '」：' + result.error };
+      segments.push({ from: a.stop, to: b.stop, legs: result.legs });
+    }
+    const legs = segments.flatMap(segment=>segment.legs);
+    if (!legs.length) return { error: '这些景点使用同一个道路接入点，步行即可就近查看。' };
+    return { segments, routePoints, legs, gap };
+  }
+
+  function plan(from, to, mode) {
+    if (from.id === to.id) return { error: '起点和终点相同。请选择另一个景点。' };
+    return { ...planItinerary([from, to], mode), from, to };
+  }
+
+  return { plan, planItinerary };
 }

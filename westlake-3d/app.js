@@ -132,22 +132,32 @@ function drawTrip(result) {
   tripBounds = null;
   delete stage.dataset.trip;
   if (!result?.legs.length) return;
-  const projected = [];
-  for (const leg of result.legs) {
+  tripBounds = { left:Infinity, right:-Infinity, top:Infinity, bottom:-Infinity };
+  for (const leg of new Set(result.legs)) {
     const {group, points} = createTrailLayer(
       { id:leg.mode, color:tripColors[leg.mode], legs:[leg] }, project, terrainAt, { outline:.043, line:.027 }
     );
     tripLayer.add(group);
-    projected.push(...points);
+    for (const [x,z] of points) {
+      tripBounds.left = Math.min(tripBounds.left,x);
+      tripBounds.right = Math.max(tripBounds.right,x);
+      tripBounds.top = Math.min(tripBounds.top,z);
+      tripBounds.bottom = Math.max(tripBounds.bottom,z);
+    }
   }
-  const xs = projected.map(p=>p[0]), zs = projected.map(p=>p[1]);
-  tripBounds = { left:Math.min(...xs), right:Math.max(...xs), top:Math.min(...zs), bottom:Math.max(...zs) };
-  for (const [name, point, label] of [['起',projected[0],result.from.name], ['终',projected.at(-1),result.to.name]]) {
+  const mapStops = new Map();
+  for (const [i,point] of result.routePoints.entries()) {
+    if (!mapStops.has(point.node)) mapStops.set(point.node, { coordinates:point.coordinates, names:[], labels:[] });
+    const marker = mapStops.get(point.node);
+    marker.names.push(point.stop.name);
+    marker.labels.push(i === 0 ? '起' : i === result.routePoints.length - 1 ? '终' : String(i));
+  }
+  for (const {coordinates,names,labels:marks} of mapStops.values()) {
     const element = document.createElement('span');
     element.className = 'map-label trip-pin';
-    element.textContent = name;
-    element.title = label;
-    const [x,z] = point;
+    element.textContent = marks.length <= 2 ? marks.join('·') : marks[0] + '＋' + (marks.length - 1);
+    element.title = [...new Set(names)].join('、');
+    const [x,z] = project(coordinates);
     tripPins.push({ element, position:new THREE.Vector3(x,terrainAt(x,z) + .02,z) });
     $('#labels').append(element);
   }

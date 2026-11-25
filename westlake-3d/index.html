@@ -93,9 +93,13 @@
     <h2 id="trip-title" tabindex="-1">景点路线规划</h2>
     <form id="trip-form">
       <div class="trip-stops">
-        <label>起点<select name="start" required><option value="">选起点</option></select></label>
-        <button id="trip-swap" type="button" aria-label="互换起点和终点" title="互换起点和终点">⇄</button>
-        <label>终点<select name="finish" required><option value="">选终点</option></select></label>
+        <label class="trip-stop-field"><span>起点</span><select name="start" required><option value="">选起点</option></select></label>
+        <ol id="trip-waypoints" aria-label="途经点" hidden></ol>
+        <div class="trip-stop-tools">
+          <button id="trip-add" type="button">＋ 添加途经点</button>
+          <button id="trip-swap" type="button">反转顺序</button>
+        </div>
+        <label class="trip-stop-field"><span>终点</span><select name="finish" required><option value="">选终点</option></select></label>
       </div>
       <fieldset class="trip-modes">
         <legend>出行方式</legend>
@@ -110,11 +114,11 @@
       <strong id="trip-summary" aria-live="polite"></strong>
       <div class="trip-result-tools">
         <button id="trip-alternate" type="button">改骑行</button>
-        <button id="trip-edit" type="button">修改起终点</button>
+        <button id="trip-edit" type="button">修改地点</button>
         <button id="trip-fit" type="button">查看全程</button>
       </div>
       <ol id="trip-parts"></ol>
-      <p id="trip-connection" class="atlas-copy" hidden>起终点以景点附近能接通的已知道路为准。</p>
+      <p id="trip-connection" class="atlas-copy" hidden>各站以景点附近能接通的已知道路为准。</p>
     </div>
     <p class="trip-note">骑行指普通自行车。路线依据已知通行限制，临时封路和景区开放请看现场指示。</p>
     <p class="trip-sources"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">道路数据</a><a href="https://hznews.hangzhou.com.cn/chengshi/content/2018-05/02/content_6862048_3.htm" target="_blank" rel="noreferrer">堤桥禁骑</a><a href="https://zzhz.zjol.com.cn/hz/csxw/201909/t20190926_11086961.shtml" target="_blank" rel="noreferrer">湖滨通行规定</a></p>
