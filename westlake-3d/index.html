@@ -92,7 +92,10 @@
   <article id="trip-panel" class="atlas-content" hidden>
     <h2 id="trip-title" tabindex="-1">景点路线规划</h2>
     <form id="trip-form">
-      <button id="trip-map-open" type="button">在地图上选</button>
+      <div class="trip-stop-tools">
+        <button id="trip-map-open" type="button">在地图上选</button>
+        <button type="button" data-trip-clear disabled>清除路线</button>
+      </div>
       <div class="trip-stops">
         <label class="trip-stop-field"><span>起点</span><select name="start" required><option value="">选起点</option></select></label>
         <ol id="trip-waypoints" aria-label="途经点" hidden></ol>
@@ -104,7 +107,8 @@
       </div>
       <fieldset class="trip-modes">
         <legend>出行方式</legend>
-        <label><input type="radio" name="mode" value="walk" checked><span>步行</span></label>
+        <label><input type="radio" name="mode" value="auto" checked><span>自动推荐</span></label>
+        <label><input type="radio" name="mode" value="walk"><span>步行</span></label>
         <label><input type="radio" name="mode" value="bike"><span>骑行</span></label>
       </fieldset>
       <button type="submit" id="trip-plan">规划路线</button>
@@ -116,9 +120,13 @@
         <button type="button" data-trip-role="finish" aria-pressed="false">终点</button>
         <button type="button" id="trip-map-done">完成</button>
       </div>
-      <p id="trip-map-hint" role="status"></p>
+      <div class="trip-map-feedback">
+        <p id="trip-map-hint" role="status"></p>
+        <button type="button" data-trip-clear disabled>清除路线</button>
+      </div>
     </div>
     <p id="trip-status" class="atlas-copy" role="status" aria-live="polite"></p>
+    <button id="trip-undo-clear" type="button" hidden>撤销清除</button>
     <div id="trip-result" hidden>
       <p id="trip-endpoints"></p>
       <strong id="trip-summary" aria-live="polite"></strong>
@@ -126,11 +134,17 @@
         <button id="trip-alternate" type="button">改骑行</button>
         <button id="trip-edit" type="button">修改地点</button>
         <button id="trip-fit" type="button">查看全程</button>
+        <button type="button" data-trip-clear disabled>清除路线</button>
       </div>
+      <ul id="trip-mode-key" class="trip-mode-key" aria-label="路线颜色" hidden>
+        <li class="trip-key-walk">步行</li>
+        <li class="trip-key-bike">骑行</li>
+      </ul>
+      <p id="trip-mode-note" class="atlas-copy" hidden></p>
       <ol id="trip-parts"></ol>
       <p id="trip-connection" class="atlas-copy" hidden>各站以景点附近能接通的已知道路为准。</p>
     </div>
-    <p class="trip-note">骑行指普通自行车。路线依据已知通行限制，临时封路和景区开放请看现场指示。</p>
+    <p class="trip-note">自动推荐会比较步行和普通自行车的预计用时，并避开已知禁骑路段。临时封路及自行车供应请以现场为准。</p>
     <p class="trip-sources"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">道路数据</a><a href="https://hznews.hangzhou.com.cn/chengshi/content/2018-05/02/content_6862048_3.htm" target="_blank" rel="noreferrer">堤桥禁骑</a><a href="https://zzhz.zjol.com.cn/hz/csxw/201909/t20190926_11086961.shtml" target="_blank" rel="noreferrer">湖滨通行规定</a></p>
   </article>
 </section>

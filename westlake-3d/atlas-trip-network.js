@@ -171,6 +171,19 @@ export function createTripNetwork(data) {
     return { error: '未找到两处之间的连续可骑行路段。试试步行，或改选有骑行道路的景点入口。' };
   }
 
+  function recommendSegment(a, b) {
+    const walking = planSegment(a, b, 'walk');
+    if (a.node === b.node) return walking;
+    const cycling = planSegment(a, b, 'bike');
+    if (cycling.error) return walking;
+    const transferMinutes = 4;
+    const cyclingMinutes = cycling.legs.reduce((sum, item) => sum + item.minutes, transferMinutes);
+    if (walking.error || cyclingMinutes < walking.legs[0].minutes) {
+      return { ...cycling, transferMinutes };
+    }
+    return walking;
+  }
+
   function planItinerary(stops, mode) {
     if (stops.length < 2) return { error: '请选择起点和终点。' };
     const savedAnchors = new Map();
@@ -199,7 +212,7 @@ export function createTripNetwork(data) {
       const a = routePoints[i - 1], b = routePoints[i];
       const key = a.node + ':' + b.node;
       if (!savedPaths.has(key)) {
-        const planned = planSegment(a, b, mode);
+        const planned = mode === 'auto' ? recommendSegment(a, b) : planSegment(a, b, mode);
         if (planned.error && mode === 'bike' && stops.length > 2) {
           const walking = planSegment(a, b, 'walk');
           savedPaths.set(key, walking.error ? planned : walking);
@@ -209,7 +222,9 @@ export function createTripNetwork(data) {
       }
       const result = savedPaths.get(key);
       if (result.error) return { error: '第 ' + i + ' 段「' + a.stop.name + ' → ' + b.stop.name + '」：' + result.error };
-      segments.push({ from: a.stop, to: b.stop, legs: result.legs });
+      const transferMinutes = result.transferMinutes ?? 0;
+      const minutes = result.legs.reduce((sum, item) => sum + item.minutes, transferMinutes);
+      segments.push({ from: a.stop, to: b.stop, legs: result.legs, minutes, transferMinutes });
     }
     const legs = segments.flatMap(segment=>segment.legs);
     if (!legs.length) return { error: '这些景点使用同一个道路接入点，步行即可就近查看。' };

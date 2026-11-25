@@ -18,6 +18,12 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   const mapButton = document.querySelector('#trip-map-open');
   const mapHint = document.querySelector('#trip-map-hint');
   const roleButtons = [...picker.querySelectorAll('[data-trip-role]')];
+  const clearButtons = [...form.closest('#trip-panel').querySelectorAll('[data-trip-clear]')];
+  const undoClear = document.querySelector('#trip-undo-clear');
+  const alternate = document.querySelector('#trip-alternate');
+  const modeKey = document.querySelector('#trip-mode-key');
+  modeKey.style.setProperty('--trip-walk', tripColors.walk);
+  modeKey.style.setProperty('--trip-bike', tripColors.bike);
   const roleNames = { start:'起点', via:'途经点', finish:'终点' };
   const stops = new Map(tripStops(places).map(place => [place.id, place]));
   function addStopOptions(select) {
@@ -25,7 +31,7 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   }
   addStopOptions(start);
   addStopOptions(finish);
-  let network, request = 0, pickRole = null;
+  let network, request = 0, pickRole = null, clearedRoute = null;
 
   function updateWaypoints() {
     const rows = Array.from(waypoints.children);
@@ -61,12 +67,12 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     row.append(label,tools);
     waypoints.append(row);
     field.value = value;
-    updateWaypoints();
     return field;
   }
 
   addWaypointButton.addEventListener('click', () => {
     const field = addWaypoint();
+    updateWaypoints();
     reset();
     field.focus();
   });
@@ -106,6 +112,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     form.hidden = Boolean(pickRole);
     details.hidden = true;
     status.textContent = '';
+    clearedRoute = null;
+    undoClear.hidden = true;
+    const canClear = Boolean(start.value || finish.value || waypoints.children.length);
+    for (const button of clearButtons) button.disabled = !canClear;
     draw(null, showDraft ? draftPoints() : []);
   }
 
@@ -127,6 +137,37 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
   document.querySelector('#trip-map-done').addEventListener('click', () => {
     setPickRole(null);
     mapButton.focus({preventScroll:true});
+  });
+
+  function clearRoute() {
+    const snapshot = {
+      values: itineraryFields().map(field => field.value),
+      planned: !details.hidden
+    };
+    start.value = '';
+    finish.value = '';
+    waypoints.replaceChildren();
+    parts.replaceChildren();
+    updateWaypoints();
+    setPickRole(null);
+    clearedRoute = snapshot;
+    undoClear.hidden = false;
+    status.textContent = '已清除路线和全部站点。';
+    undoClear.focus();
+  }
+  for (const button of clearButtons) button.addEventListener('click', clearRoute);
+  undoClear.addEventListener('click', () => {
+    const {values, planned} = clearedRoute;
+    start.value = values[0];
+    finish.value = values.at(-1);
+    for (const value of values.slice(1,-1)) addWaypoint(value);
+    updateWaypoints();
+    reset();
+    if (planned) form.requestSubmit();
+    else {
+      status.textContent = '已恢复站点。';
+      mapButton.focus({preventScroll:true});
+    }
   });
 
   function formatLeg(leg, index, count) {
@@ -174,9 +215,8 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     caption.textContent = (index + 1) + '. ' + segment.from.name + ' → ' + segment.to.name;
     const modes = ['bike','walk'].filter(mode=>segment.legs.some(leg=>leg.mode===mode)).map(mode=>modeNames[mode]);
     const distance = segment.legs.reduce((sum, leg)=>sum + leg.distance, 0);
-    const minutes = segment.legs.reduce((sum, leg)=>sum + leg.minutes, 0);
     metrics.textContent = segment.legs.length
-      ? modes.join('＋') + ' · ' + amount(distance) + ' · 约 ' + Math.max(1, Math.round(minutes)) + ' 分钟'
+      ? modes.join('＋') + ' · ' + amount(distance) + ' · 约 ' + Math.max(1, Math.round(segment.minutes)) + ' 分钟'
       : '同一道路接入点';
     heading.append(caption,metrics);
     disclosure.append(heading);
@@ -192,21 +232,27 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
 
   function show(result) {
     const total = result.legs.reduce((sum, leg) => sum + leg.distance, 0);
-    const minutes = result.legs.reduce((sum, leg) => sum + leg.minutes, 0);
+    const minutes = result.segments.reduce((sum, segment) => sum + segment.minutes, 0);
+    const transferMinutes = result.segments.reduce((sum, segment) => sum + segment.transferMinutes, 0);
     const modes = ['bike','walk'].filter(mode=>result.legs.some(leg=>leg.mode===mode)).map(mode=>modeNames[mode]);
+    const chosenMode = form.elements.mode.value;
+    const hasCycling = modes.includes('骑行');
     form.hidden = true;
     details.hidden = false;
     const path = result.routePoints;
     const count = path.length - 2;
     document.querySelector('#trip-endpoints').textContent = path[0].stop.name + ' → ' + path.at(-1).stop.name
       + (count ? ' · 途经 ' + count + ' 站' : '');
-    summary.textContent = modes.join('＋') + ' · ' + amount(total) + ' · 约 ' + Math.max(1, Math.round(minutes)) + ' 分钟';
-    document.querySelector('#trip-alternate').textContent = form.elements.mode.value === 'bike' ? '改步行' : '改骑行';
-    if (form.elements.mode.value === 'bike' && !modes.includes('骑行')) {
-      status.textContent = '这些路段均按步行规划。';
-    } else {
-      status.textContent = '';
-    }
+    summary.textContent = (chosenMode === 'auto' ? '自动推荐 · ' : '') + modes.join('＋')
+      + ' · ' + amount(total) + ' · 约 ' + Math.max(1, Math.round(minutes)) + ' 分钟';
+    alternate.dataset.mode = chosenMode === 'bike' || (chosenMode === 'auto' && hasCycling) ? 'walk' : 'bike';
+    alternate.textContent = alternate.dataset.mode === 'walk' ? '改步行' : '改骑行';
+    modeKey.hidden = modes.length < 2;
+    const modeNote = document.querySelector('#trip-mode-note');
+    modeNote.textContent = transferMinutes ? '已计入约 ' + transferMinutes + ' 分钟取车和停车时间。'
+      : chosenMode === 'bike' && !hasCycling ? '这些路段均按步行规划。' : '';
+    modeNote.hidden = !modeNote.textContent;
+    status.textContent = '';
     parts.replaceChildren();
     parts.classList.toggle('trip-segments', count > 0);
     if (count) {
@@ -251,8 +297,8 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
     reset();
     start.focus({preventScroll:true});
   });
-  document.querySelector('#trip-alternate').addEventListener('click', () => {
-    form.elements.mode.value = form.elements.mode.value === 'bike' ? 'walk' : 'bike';
+  alternate.addEventListener('click', () => {
+    form.elements.mode.value = alternate.dataset.mode;
     form.requestSubmit();
   });
   return {
@@ -275,7 +321,10 @@ export function createTripPlanner(places, loadNetwork, draw, fit, showMapStops) 
       if (role === 'via') {
         const empty = [...waypoints.querySelectorAll('select')].find(field => !field.value);
         if (empty) empty.value = place;
-        else addWaypoint(place);
+        else {
+          addWaypoint(place);
+          updateWaypoints();
+        }
       } else {
         (role === 'start' ? start : finish).value = place;
       }
