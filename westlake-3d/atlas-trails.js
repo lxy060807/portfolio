@@ -18,6 +18,15 @@ const baoshiLightLoop = [
   ['584423047', '5586466176', '5586466155'], ['587415805', '5586466155', '5586466264']
 ];
 
+const baoshiLightBranches = [
+  // Huanglong Cave, the northern slope and the approaches from Qixia and Geling.
+  [['277309779', '5586466264', '5586466272'], ['584423054', '5586466272', '5586466285'], ['589666441', '5586466285', '5630850890']],
+  [['589666434', '5586466155', '5630850823']],
+  [['277309779', '5586466272', '5586466268'], ['220971922', '5586466268', '2300358754']],
+  [['976825032', '5586466231', '9039334732'], ['782582514', '9039334732', '7308084792']],
+  [['589666433', '5630850000', '6642625045']]
+];
+
 export const trails = [
   {
     id: 'huanglong', name: '黄龙洞后山口', color: '#08796d', side: '西北侧',
@@ -107,10 +116,10 @@ export function readTrails(roads) {
   }) }));
 }
 
-export function readBaoshiLightLoop(roads) {
+export function readBaoshiLightPaths(roads) {
   const ways = new Map(roads.map(road => [road.id, road]));
-  const coordinates = baoshiLightLoop.flatMap(([way, from, to]) =>
-    readLeg(ways.get(way), { way, from, to }).coordinates.slice(0, -1));
-  coordinates.push(coordinates[0]);
-  return coordinates;
+  return [baoshiLightLoop, ...baoshiLightBranches].map(path => path.flatMap(([way, from, to], i) => {
+    const { coordinates } = readLeg(ways.get(way), { way, from, to });
+    return i === 0 ? coordinates : coordinates.slice(1);
+  }));
 }

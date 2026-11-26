@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from './OrbitControls.js';
 import {mergeGeometries, mergeVertices} from './BufferGeometryUtils.js';
 import { places } from './atlas-data.js';
-import { readTrails, readBaoshiLightLoop } from './atlas-trails.js';
+import { readTrails, readBaoshiLightPaths } from './atlas-trails.js';
 import { createAtlasUI } from './atlas-ui.js';
 import { createBuildingLayer, createTrailLayer, createTrailOverview } from './atlas-geometry.js';
 import { buildCauseways, buildStoneLanterns, causewayWays, layoutCauseways } from './atlas-waterfront.js';
@@ -451,7 +451,7 @@ function build(d, footprintData){
  const treeLocation = (x, z, clearance = .05) => !inWater(x,z) &&
    !landmarkPoints.some(([px,pz]) => Math.hypot(x-px,z-pz) < clearance) &&
    !buildings.nearbyFootprints(x,z).some(r => inPoly(x,z,r));
- const baoshiTrees = lighting.addBaoshiTreeLights(readBaoshiLightLoop(d.roads).map(project), terrainAt,
+ const baoshiTrees = lighting.addBaoshiTreeLights(readBaoshiLightPaths(d.roads).map(path => path.map(project)), terrainAt,
    (x,z) => treeLocation(x,z,.016));
  const canopyAt = (x,y,z,size,shape,angle) => {
    const geometry = treeBase.clone();

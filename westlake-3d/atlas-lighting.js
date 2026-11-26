@@ -380,33 +380,38 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
     streetLayer = addPoints(street, 'Mapped_Street_Lights');
   }
 
-  function addBaoshiTreeLights(path, terrainAt, canPlant) {
+  function addBaoshiTreeLights(paths, terrainAt, canPlant) {
     const lights = { positions: [], styles: [] };
     const trees = [], pools = [];
-    let next = .007, index = 0;
-    for (let i = 1; i < path.length; i++) {
-      const [ax, az] = path[i - 1], [bx, bz] = path[i];
-      const length = Math.hypot(bx - ax, bz - az);
-      for (; next < length;) {
-        const x = mix(ax, bx, next / length), z = mix(az, bz, next / length);
-        const seed = seedAt(x, z);
-        next += .014 + seed * .007;
-        const distance = .009 + seed * .004;
-        const side = index++ % 2 ? 1 : -1;
-        const dx = (bz - az) / length * distance * side;
-        const dz = (ax - bx) / length * distance * side;
-        const sign = canPlant(x + dx, z + dz) ? 1 : -1;
-        const tx = x + dx * sign, tz = z + dz * sign;
-        if (!canPlant(tx, tz) || trees.some(({x: px, z: pz}) => (px - tx) ** 2 + (pz - tz) ** 2 < .011 ** 2)) continue;
-        const y = terrainAt(tx, tz);
-        const size = .0088 + seed * .004;
-        const lampX = mix(tx, x, .88), lampY = y + size * 1.58, lampZ = mix(tz, z, .88);
-        trees.push({ x: tx, z: tz, y, size, lampX, lampY, lampZ });
-        lights.positions.push(lampX, lampY, lampZ);
-        lights.styles.push(.89 + seed * .50, 1.25 + seed * .43, .32 + seed * .30);
-        pools.push([mix(tx, x, .73), mix(tz, z, .73), .013 + seed * .006]);
+    for (const [pathIndex, path] of paths.entries()) {
+      const branch = pathIndex > 0;
+      let next = branch ? .019 + .026 * seedAt(...path[0]) : .009;
+      for (let i = 1; i < path.length; i++) {
+        const [ax, az] = path[i - 1], [bx, bz] = path[i];
+        const length = Math.hypot(bx - ax, bz - az);
+        while (next < length) {
+          const x = mix(ax, bx, next / length), z = mix(az, bz, next / length);
+          const seed = seedAt(x, z), spread = seedAt(x + .49, z - .71);
+          next += branch ? .042 + seed * .046 : .019 + seed * .029;
+          const distance = .009 + spread * spread * .024;
+          const side = seedAt(x - .27, z + .16) < .5 ? -1 : 1;
+          const dx = (bz - az) / length * distance * side;
+          const dz = (ax - bx) / length * distance * side;
+          const sign = canPlant(x + dx, z + dz) ? 1 : -1;
+          const tx = x + dx * sign, tz = z + dz * sign;
+          if (!canPlant(tx, tz) || trees.some(({x: px, z: pz}) => (px - tx) ** 2 + (pz - tz) ** 2 < .018 ** 2)) continue;
+          const y = terrainAt(tx, tz);
+          const size = .0088 + seed * .004;
+          const reach = Math.min(.88, size / distance);
+          const lampX = mix(tx, x, reach), lampY = y + size * 1.58, lampZ = mix(tz, z, reach);
+          trees.push({ x: tx, z: tz, y, size, lampX, lampY, lampZ });
+          lights.positions.push(lampX, lampY, lampZ);
+          lights.styles.push(.64 + seed * .73, 1.05 + seed * .52, .22 + spread * .44);
+          const spill = Math.min(.72, .014 / distance);
+          pools.push([mix(tx, x, spill), mix(tz, z, spill), .008 + seed * .006]);
+        }
+        next -= length;
       }
-      next -= length;
     }
     const bulbs = addPoints(lights, 'Baoshi_Tree_Lights');
     bulbs.userData.trees = trees;
@@ -446,7 +451,7 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       fragmentShader: `
         uniform float night;
         varying float groundLight;
-        void main() { gl_FragColor = vec4(.95, .76, .48, groundLight * night * .33); }
+        void main() { gl_FragColor = vec4(.95, .76, .48, groundLight * night * .24); }
       `
     });
     const wash = new THREE.Mesh(geometry, material);
