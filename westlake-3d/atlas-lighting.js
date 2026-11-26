@@ -199,6 +199,9 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   lanterns.visible = false;
   scene.add(lanterns);
   const landmarkMaterials = [];
+  const ridgeSampleCount = 7;
+  const ridgeSamples = { value: Array.from({ length: ridgeSampleCount }, () => new THREE.Vector2(100, 100)) };
+  const ridgeMaterials = new WeakSet();
   const facadeLights = { positions: [], styles: [] };
   let shoreline, facadeLayer, streetLayer;
 
@@ -412,12 +415,65 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       fragmentShader: `
         uniform float night;
         varying float groundLight;
-        void main() { gl_FragColor = vec4(.84, .78, .64, groundLight * night * .31); }
+        void main() { gl_FragColor = vec4(.84, .78, .64, groundLight * night * .22); }
       `
     });
     const wash = new THREE.Mesh(geometry, material);
     wash.name = 'Baoshi_Ridge_Light_Wash';
     lanterns.add(wash);
+  }
+
+  function locateBaoshiRidge(roads, project) {
+    const ridge = roads.filter(way => ['584423052', '589666433'].includes(String(way.id)))
+      .flatMap(way => way.c.map(project)).sort((a, b) => a[0] - b[0]);
+    if (!ridge.length) return;
+    const width = ridge.at(-1)[0] - ridge[0][0];
+    ridgeSamples.value.forEach((point, i) => {
+      const x = ridge[0][0] + width * i / (ridgeSampleCount - 1);
+      let closest = ridge[0];
+      for (const candidate of ridge) {
+        if (Math.abs(candidate[0] - x) < Math.abs(closest[0] - x)) closest = candidate;
+      }
+      point.set(...closest);
+    });
+  }
+
+  function lightBaoshiSurface(material, amount) {
+    if (ridgeMaterials.has(material)) return;
+    ridgeMaterials.add(material);
+    const compile = material.onBeforeCompile;
+    const cacheKey = material.customProgramCacheKey();
+    material.customProgramCacheKey = () => cacheKey + ':baoshi-surface';
+    material.onBeforeCompile = shader => {
+      compile.call(material, shader);
+      Object.assign(shader.uniforms, { ridgeSamples, ridgeNight: night, ridgeAmount: { value: amount } });
+      shader.vertexShader = 'varying vec3 ridgePosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        ridgePosition = (modelMatrix * vec4(position, 1.0)).xyz;
+      `);
+      shader.fragmentShader = `
+        varying vec3 ridgePosition;
+        uniform vec2 ridgeSamples[${ridgeSampleCount}];
+        uniform float ridgeNight, ridgeAmount;
+        ${shader.fragmentShader}
+      `.replace('#include <emissivemap_fragment>', `
+        #include <emissivemap_fragment>
+        if (ridgeNight > .001 && ridgePosition.y > .048) {
+          float ridgeLight = 0.0;
+          for (int i = 0; i < ${ridgeSampleCount}; i++) {
+            vec2 offset = ridgePosition.xz - ridgeSamples[i] - vec2(0.0, .052);
+            vec2 falloff = offset / vec2(.162, .20);
+            float weight = .79 + .21 * cos(float(i) * 1.6 + .25);
+            ridgeLight = max(ridgeLight, exp(-dot(falloff, falloff) * 1.65) * weight);
+          }
+          vec3 slope = inverseTransformDirection(normal, viewMatrix);
+          float facing = max(0.0, dot(slope, normalize(vec3(.19, .46, .87))));
+          float hill = smoothstep(.048, .114, ridgePosition.y);
+          float intensity = ridgeNight * ridgeAmount * hill * smoothstep(.03, .88, ridgeLight);
+          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, .81, .57) * intensity * (.23 + .77 * facing);
+        }
+      `);
+    };
   }
 
   function lightLandmark(object, color, strength) {
@@ -453,7 +509,7 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   }
   apply('day');
   return {
-    addFacade, populateRoads, lightLandmark,
+    addFacade, populateRoads, lightLandmark, locateBaoshiRidge, lightBaoshiSurface,
     finishFacades() { facadeLayer = addPoints(facadeLights, 'Mapped_Facade_Windows'); },
     dimShoreline(material) { shoreline = material; shoreline.transparent = true; shoreline.depthWrite = false; },
     weatherSurface: weather.surface,
