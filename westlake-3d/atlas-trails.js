@@ -8,6 +8,16 @@ const fromChuyang = [
   ridge('5586466175')
 ];
 
+// The lighting follows mapped trail edges from Chuyang Terrace to Baochu Pagoda,
+// returning via Deng Kailing and the north-slope woodland paths.
+const baoshiLightLoop = [
+  ['584423049', '5586466264', '5586466175'], ['584423052', '5586466175', '5586466191'],
+  ['589666433', '5586466191', '5630850000'], ['706869404', '5630850000', '6642625064'],
+  ['747496138', '6642625064', '9039334828'], ['976825033', '9039334828', '5586466147'],
+  ['584423046', '5586466147', '5586466181'], ['584423050', '5586466181', '5586466176'],
+  ['584423047', '5586466176', '5586466155'], ['587415805', '5586466155', '5586466264']
+];
+
 export const trails = [
   {
     id: 'huanglong', name: '黄龙洞后山口', color: '#08796d', side: '西北侧',
@@ -76,25 +86,31 @@ export const trails = [
   }
 ];
 
+function readLeg(way, leg) {
+  if (!way || !way.walk || way.tunnel) throw new Error('Missing walking route way: ' + leg.way);
+  const from = way.nodes.indexOf(leg.from), to = way.nodes.indexOf(leg.to);
+  if (from < 0 || to < 0 || from === to) throw new Error('Missing route nodes: ' + leg.way);
+  const start = Math.min(from, to), end = Math.max(from, to) + 1;
+  const coordinates = way.c.slice(start, end), nodes = way.nodes.slice(start, end);
+  if (from > to) {
+    coordinates.reverse();
+    nodes.reverse();
+  }
+  return { ...leg, coordinates, nodes, stairs: way.kind === 'steps' };
+}
+
 export function readTrails(roads) {
   const ways = new Map(roads.map(road => [road.id, road]));
-  return trails.map(trail => {
-    const legs = trail.legs.map((leg, index) => {
-      const way = ways.get(leg.way);
-      if (!way || !way.walk || way.tunnel) throw new Error('Missing walking route way: ' + leg.way);
-      if (index && trail.legs[index - 1].to !== leg.from) throw new Error('Disconnected route: ' + trail.id);
-      const from = way.nodes.indexOf(leg.from);
-      const to = way.nodes.indexOf(leg.to);
-      if (from < 0 || to < 0 || from === to) throw new Error('Missing route nodes: ' + leg.way);
-      const start = Math.min(from, to), end = Math.max(from, to) + 1;
-      const coordinates = way.c.slice(start, end);
-      const nodes = way.nodes.slice(start, end);
-      if (from > to) {
-        coordinates.reverse();
-        nodes.reverse();
-      }
-      return { ...leg, coordinates, nodes, stairs: way.kind === 'steps' };
-    });
-    return { ...trail, legs };
-  });
+  return trails.map(trail => ({ ...trail, legs: trail.legs.map((leg, index) => {
+    if (index && trail.legs[index - 1].to !== leg.from) throw new Error('Disconnected route: ' + trail.id);
+    return readLeg(ways.get(leg.way), leg);
+  }) }));
+}
+
+export function readBaoshiLightLoop(roads) {
+  const ways = new Map(roads.map(road => [road.id, road]));
+  const coordinates = baoshiLightLoop.flatMap(([way, from, to]) =>
+    readLeg(ways.get(way), { way, from, to }).coordinates.slice(0, -1));
+  coordinates.push(coordinates[0]);
+  return coordinates;
 }

@@ -199,11 +199,8 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   lanterns.visible = false;
   scene.add(lanterns);
   const landmarkMaterials = [];
-  const ridgeSampleCount = 7;
-  const ridgeSamples = { value: Array.from({ length: ridgeSampleCount }, () => new THREE.Vector2(100, 100)) };
-  const ridgeMaterials = new WeakSet();
   const facadeLights = { positions: [], styles: [] };
-  let shoreline, facadeLayer, streetLayer;
+  let shoreline, facadeLayer, streetLayer, baoshiLayer;
 
   let rendered, transition;
   function updateFog() {
@@ -328,8 +325,7 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   }
 
   function populateRoads(roads, causewayWays, project, terrainAt, inWater, bounds) {
-    const street = { positions: [], styles: [] }, hillside = { positions: [], styles: [] };
-    const hillWash = [];
+    const street = { positions: [], styles: [] };
     const shore = [];
     const take = new Set();
     const [west, south, east, north] = bounds;
@@ -337,12 +333,10 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       if (way.tunnel || Number(way.layer) < 0) continue;
       const causeway = causewayWays.has(String(way.id));
       const waterfront = /^(北山街|湖滨路|南山路|孤山路|杨公堤)$/.test(way.name);
-      const mountain = ['589666433', '706869403', '706869404'].includes(String(way.id)) ||
-        /^(宝石山上路|宝石山下一弄|保俶塔前山路|葛岭路)$/.test(way.name);
       const trunk = /^(trunk|primary|secondary)(_link)?$/.test(way.kind);
       const local = /^(tertiary|residential|unclassified|living_street|pedestrian|service)$/.test(way.kind);
-      if (!(causeway || waterfront || mountain || trunk || local)) continue;
-      const spacing = mountain ? .043 : causeway ? .060 : waterfront ? .026 : trunk ? .020 : .027;
+      if (!(causeway || waterfront || trunk || local)) continue;
+      const spacing = causeway ? .060 : waterfront ? .026 : trunk ? .020 : .027;
       let next = spacing * (.35 + .5 * seedAt(...way.c[0]));
       for (let i = 1; i < way.c.length; i++) {
         const from = way.c[i - 1], to = way.c[i];
@@ -355,21 +349,19 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
           if (lon < west || lon > east || lat < south || lat > north) continue;
           const urban = isCity([lon, lat]);
           const seed = seedAt(lon, lat);
-          if (!(causeway || waterfront || mountain || urban || (trunk && seed > .58))) continue;
+          if (!(causeway || waterfront || urban || (trunk && seed > .58))) continue;
           if (way.kind === 'service' && seed < .68) continue;
           const x = mix(ax, bx, fraction), z = mix(az, bz, fraction);
           if (!causeway && !way.bridge && inWater(x, z)) continue;
           const h = terrainAt(x, z);
-          if (!mountain && !waterfront && !causeway && h > .115) continue;
+          if (!waterfront && !causeway && h > .115) continue;
           const key = `${Math.round(x / .011)}:${Math.round(z / .011)}`;
           if (take.has(key)) continue;
           take.add(key);
           const y = Math.max(h + (trunk ? .012 : .009), way.bridge ? .064 : .032);
-          const target = mountain ? hillside : street;
-          target.positions.push(x, y, z);
-          const strength = (mountain ? .43 : causeway ? .34 : waterfront ? .88 : trunk ? 1.13 : .66) * (.64 + .58 * seed);
-          target.styles.push(strength, trunk ? 1.35 : waterfront ? 1.18 : 1.00, mountain ? .68 : waterfront ? .19 : seed * .67);
-          if (mountain && h > .083 && seed > .38) hillWash.push([x, z, .033 + seed * .026]);
+          street.positions.push(x, y, z);
+          const strength = (causeway ? .34 : waterfront ? .88 : trunk ? 1.13 : .66) * (.64 + .58 * seed);
+          street.styles.push(strength, trunk ? 1.35 : waterfront ? 1.18 : 1.00, waterfront ? .19 : seed * .67);
           if (waterfront && [0, 1, 2, 3].some(n => inWater(x + .033 * Math.cos(n * Math.PI / 2), z + .033 * Math.sin(n * Math.PI / 2)))) {
             shore.push([x, y, z, strength]);
           }
@@ -386,10 +378,49 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       if (reflectionSources.length === shoreReflectionCount) break;
     }
     streetLayer = addPoints(street, 'Mapped_Street_Lights');
-    addPoints(hillside, 'Baoshi_Access_Lights');
+  }
+
+  function addBaoshiTreeLights(path, terrainAt, canPlant) {
+    const lights = { positions: [], styles: [] };
+    const trees = [], pools = [];
+    let next = .007, index = 0;
+    for (let i = 1; i < path.length; i++) {
+      const [ax, az] = path[i - 1], [bx, bz] = path[i];
+      const length = Math.hypot(bx - ax, bz - az);
+      for (; next < length;) {
+        const x = mix(ax, bx, next / length), z = mix(az, bz, next / length);
+        const seed = seedAt(x, z);
+        next += .014 + seed * .007;
+        const distance = .009 + seed * .004;
+        const side = index++ % 2 ? 1 : -1;
+        const dx = (bz - az) / length * distance * side;
+        const dz = (ax - bx) / length * distance * side;
+        const sign = canPlant(x + dx, z + dz) ? 1 : -1;
+        const tx = x + dx * sign, tz = z + dz * sign;
+        if (!canPlant(tx, tz) || trees.some(({x: px, z: pz}) => (px - tx) ** 2 + (pz - tz) ** 2 < .011 ** 2)) continue;
+        const y = terrainAt(tx, tz);
+        const size = .0088 + seed * .004;
+        const lampX = mix(tx, x, .88), lampY = y + size * 1.58, lampZ = mix(tz, z, .88);
+        trees.push({ x: tx, z: tz, y, size, lampX, lampY, lampZ });
+        lights.positions.push(lampX, lampY, lampZ);
+        lights.styles.push(.89 + seed * .50, 1.25 + seed * .43, .32 + seed * .30);
+        pools.push([mix(tx, x, .73), mix(tz, z, .73), .013 + seed * .006]);
+      }
+      next -= length;
+    }
+    const bulbs = addPoints(lights, 'Baoshi_Tree_Lights');
+    bulbs.userData.trees = trees;
+    baoshiLayer = new THREE.Group();
+    baoshiLayer.name = 'Baoshi_Woodland_Lighting';
+    baoshiLayer.add(bulbs, createTrailLightPools(pools, terrainAt));
+    lanterns.add(baoshiLayer);
+    return trees;
+  }
+
+  function createTrailLightPools(pools, terrainAt) {
     const positions = [], falloff = [], indices = [];
-    const divisions = 12;
-    for (const [x, z, radius] of hillWash) {
+    const divisions = 6;
+    for (const [x, z, radius] of pools) {
       for (let row = 0; row <= divisions; row++) {
         for (let column = 0; column <= divisions; column++) {
           const u = column / divisions * 2 - 1, v = row / divisions * 2 - 1;
@@ -415,65 +446,12 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       fragmentShader: `
         uniform float night;
         varying float groundLight;
-        void main() { gl_FragColor = vec4(.84, .78, .64, groundLight * night * .22); }
+        void main() { gl_FragColor = vec4(.95, .76, .48, groundLight * night * .33); }
       `
     });
     const wash = new THREE.Mesh(geometry, material);
-    wash.name = 'Baoshi_Ridge_Light_Wash';
-    lanterns.add(wash);
-  }
-
-  function locateBaoshiRidge(roads, project) {
-    const ridge = roads.filter(way => ['584423052', '589666433'].includes(String(way.id)))
-      .flatMap(way => way.c.map(project)).sort((a, b) => a[0] - b[0]);
-    if (!ridge.length) return;
-    const width = ridge.at(-1)[0] - ridge[0][0];
-    ridgeSamples.value.forEach((point, i) => {
-      const x = ridge[0][0] + width * i / (ridgeSampleCount - 1);
-      let closest = ridge[0];
-      for (const candidate of ridge) {
-        if (Math.abs(candidate[0] - x) < Math.abs(closest[0] - x)) closest = candidate;
-      }
-      point.set(...closest);
-    });
-  }
-
-  function lightBaoshiSurface(material, amount) {
-    if (ridgeMaterials.has(material)) return;
-    ridgeMaterials.add(material);
-    const compile = material.onBeforeCompile;
-    const cacheKey = material.customProgramCacheKey();
-    material.customProgramCacheKey = () => cacheKey + ':baoshi-surface';
-    material.onBeforeCompile = shader => {
-      compile.call(material, shader);
-      Object.assign(shader.uniforms, { ridgeSamples, ridgeNight: night, ridgeAmount: { value: amount } });
-      shader.vertexShader = 'varying vec3 ridgePosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', `
-        #include <begin_vertex>
-        ridgePosition = (modelMatrix * vec4(position, 1.0)).xyz;
-      `);
-      shader.fragmentShader = `
-        varying vec3 ridgePosition;
-        uniform vec2 ridgeSamples[${ridgeSampleCount}];
-        uniform float ridgeNight, ridgeAmount;
-        ${shader.fragmentShader}
-      `.replace('#include <emissivemap_fragment>', `
-        #include <emissivemap_fragment>
-        if (ridgeNight > .001 && ridgePosition.y > .048) {
-          float ridgeLight = 0.0;
-          for (int i = 0; i < ${ridgeSampleCount}; i++) {
-            vec2 offset = ridgePosition.xz - ridgeSamples[i] - vec2(0.0, .052);
-            vec2 falloff = offset / vec2(.162, .20);
-            float weight = .79 + .21 * cos(float(i) * 1.6 + .25);
-            ridgeLight = max(ridgeLight, exp(-dot(falloff, falloff) * 1.65) * weight);
-          }
-          vec3 slope = inverseTransformDirection(normal, viewMatrix);
-          float facing = max(0.0, dot(slope, normalize(vec3(.19, .46, .87))));
-          float hill = smoothstep(.048, .114, ridgePosition.y);
-          float intensity = ridgeNight * ridgeAmount * hill * smoothstep(.03, .88, ridgeLight);
-          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, .81, .57) * intensity * (.23 + .77 * facing);
-        }
-      `);
-    };
+    wash.name = 'Baoshi_Trail_Light_Pools';
+    return wash;
   }
 
   function lightLandmark(object, color, strength) {
@@ -509,7 +487,22 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   }
   apply('day');
   return {
-    addFacade, populateRoads, lightLandmark, locateBaoshiRidge, lightBaoshiSurface,
+    addFacade, populateRoads, lightLandmark, addBaoshiTreeLights,
+    lightCanopies(material) {
+      material.emissive.setHex(0xe3b383).lerp(material.color, .23);
+      material.emissiveIntensity = 0;
+      landmarkMaterials.push([material, .64]);
+      const compile = material.onBeforeCompile;
+      const key = material.customProgramCacheKey();
+      material.customProgramCacheKey = () => key + ':baoshi-canopy';
+      material.onBeforeCompile = shader => {
+        compile.call(material, shader);
+        shader.vertexShader = 'attribute float canopyLamp; varying float canopyGlow;\n' +
+          shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n canopyGlow = canopyLamp;');
+        shader.fragmentShader = 'varying float canopyGlow;\n' +
+          shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= canopyGlow;');
+      };
+    },
     finishFacades() { facadeLayer = addPoints(facadeLights, 'Mapped_Facade_Windows'); },
     dimShoreline(material) { shoreline = material; shoreline.transparent = true; shoreline.depthWrite = false; },
     weatherSurface: weather.surface,
@@ -530,6 +523,7 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       if (lanterns.visible && facadeLayer && streetLayer) {
         facadeLayer.visible = layers.Buildings.visible;
         streetLayer.visible = layers.Roads.visible;
+        if (baoshiLayer) baoshiLayer.visible = layers.Trees.visible;
       }
     }
   };

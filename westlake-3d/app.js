@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from './OrbitControls.js';
 import {mergeGeometries, mergeVertices} from './BufferGeometryUtils.js';
 import { places } from './atlas-data.js';
-import { readTrails } from './atlas-trails.js';
+import { readTrails, readBaoshiLightLoop } from './atlas-trails.js';
 import { createAtlasUI } from './atlas-ui.js';
 import { createBuildingLayer, createTrailLayer, createTrailOverview } from './atlas-geometry.js';
 import { buildCauseways, buildStoneLanterns, causewayWays, layoutCauseways } from './atlas-waterfront.js';
@@ -362,9 +362,6 @@ function addLakeBoats() {
 
 function build(d, footprintData){
  const n=d.size,[west,south,east,north]=d.bbox;const[xmin,zmax]=project([west,south]),[xmax,zmin]=project([east,north]);
- lighting.locateBaoshiRidge(d.roads, project);
- lighting.lightBaoshiSurface(materials.earth, .93);
- lighting.lightBaoshiSurface(materials.road, .49);
  const waters=d.water.map(r=>({...ringInfo(r.c.map(project)),role:r.role})),outer=waters.filter(r=>r.role==='outer'),inner=waters.filter(r=>r.role==='inner');
  inWater=(x,z)=>outer.some(r=>inPoly(x,z,r))&&!inner.some(r=>inPoly(x,z,r));
  const causewayLayout = layoutCauseways(d.roads, project);
@@ -451,13 +448,44 @@ function build(d, footprintData){
  let seed=2731;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};const crowns=[[],[],[]],trunks=[],treeMats=['#527657','#65845b','#819964'].map((c,i)=>mat('Canopy_'+i,c));
  const treeBase=compactUntextured(new THREE.SphereGeometry(1,6,4));
  const trunkBase=compactUntextured(new THREE.CylinderGeometry(.0014,.002,.014,5));
- let count=0;for(let t=0;t<55000&&count<3750;t++){const x=xmin+.03+rand()*(xmax-xmin-.06),z=zmin+.03+rand()*(zmax-zmin-.06),y=terrainAt(x,z);if(inWater(x,z)||landmarkPoints.some(p=>Math.hypot(x-p[0],z-p[1])<.05)||buildings.nearbyFootprints(x,z).some(r=>inPoly(x,z,r))||nearRoute(x,z))continue;if(!greenRings.some(r=>inPoly(x,z,r))&&!(y>.13&&x<.8))continue;const s=.009+rand()*.009;const c=treeBase.clone();c.scale(s,s*(1.15+rand()*.4),s);c.rotateY(rand()*6.28);c.translate(x,y+s+.01,z);crowns[count%3].push(c);const tr=trunkBase.clone();tr.translate(x,y+.007,z);trunks.push(tr);count++}
- for(let i=0;i<3;i++)merged(crowns[i],treeMats[i],'Canopy_'+i,groups.Trees);merged(trunks,materials.wood,'Tree_Trunks',groups.Trees);treeBase.dispose();trunkBase.dispose();
- groups.Trees.traverse(object => {
-   if (object.material?.isMeshStandardMaterial) {
-     lighting.weatherSurface(object.material, .78, .55);
-     lighting.lightBaoshiSurface(object.material, 1.15);
+ const treeLocation = (x, z, clearance = .05) => !inWater(x,z) &&
+   !landmarkPoints.some(([px,pz]) => Math.hypot(x-px,z-pz) < clearance) &&
+   !buildings.nearbyFootprints(x,z).some(r => inPoly(x,z,r));
+ const baoshiTrees = lighting.addBaoshiTreeLights(readBaoshiLightLoop(d.roads).map(project), terrainAt,
+   (x,z) => treeLocation(x,z,.016));
+ const canopyAt = (x,y,z,size,shape,angle) => {
+   const geometry = treeBase.clone();
+   geometry.scale(size, size * shape, size);
+   geometry.rotateY(angle);
+   geometry.translate(x, y + size + .01, z);
+   return geometry;
+ };
+ const trunkAt = (x,y,z) => {
+   const geometry = trunkBase.clone();
+   geometry.translate(x,y+.007,z);
+   return geometry;
+ };
+ const grove = baoshiTrees.map(({x,z,y,size,lampX,lampY,lampZ}, i) => {
+   trunks.push(trunkAt(x,y,z));
+   const canopy = canopyAt(x,y,z,size,1.15+i%5*.065,i*2.4);
+   const points = canopy.getAttribute('position');
+   const glow = new Float32Array(points.count);
+   for (let vertex = 0; vertex < points.count; vertex++) {
+     const distance = Math.hypot(points.getX(vertex)-lampX,points.getY(vertex)-lampY,points.getZ(vertex)-lampZ);
+     glow[vertex] = .035 + .81 * Math.exp(-distance * distance / (.0065 + size * .55) ** 2);
    }
+   canopy.setAttribute('canopyLamp', new THREE.BufferAttribute(glow, 1));
+   return canopy;
+ });
+ const groveMaterial = mat('Baoshi_Lantern_Canopy', 0x527657);
+ lighting.weatherSurface(groveMaterial, .78, .55);
+ lighting.lightCanopies(groveMaterial);
+ merged(grove,groveMaterial,'Baoshi_Lantern_Trees',groups.Trees);
+ let count=0;for(let t=0;t<55000&&count<3750;t++){const x=xmin+.03+rand()*(xmax-xmin-.06),z=zmin+.03+rand()*(zmax-zmin-.06),y=terrainAt(x,z);if(!treeLocation(x,z)||nearRoute(x,z)||baoshiTrees.some(({x:tx,z:tz})=>(x-tx)**2+(z-tz)**2<.015**2))continue;if(!greenRings.some(r=>inPoly(x,z,r))&&!(y>.13&&x<.8))continue;const s=.009+rand()*.009;crowns[count%3].push(canopyAt(x,y,z,s,1.15+rand()*.4,rand()*6.28));trunks.push(trunkAt(x,y,z));count++}
+ for(let i=0;i<3;i++)merged(crowns[i],treeMats[i],'Canopy_'+i,groups.Trees);merged(trunks,materials.wood,'Tree_Trunks',groups.Trees);treeBase.dispose();trunkBase.dispose();
+ count += baoshiTrees.length;
+ groups.Trees.traverse(object => {
+   if (object.material?.isMeshStandardMaterial) lighting.weatherSurface(object.material, .78, .55);
  });
  // Named landmarks are deliberately stylized volumes, separate and editable in Blender.
  function pagoda(name,c,levels,tall,radius){const g=new THREE.Group();g.name=name;const[x,z]=project(c),y=terrainAt(x,z);g.position.set(x,y+.006,z);groups.Landmarks.add(g);const add=(geo,m,n,h)=>{geo.translate(0,h,0);return mesh(geo,m,n,g)};add(new THREE.CylinderGeometry(radius*1.3,radius*1.4,.008,8),materials.stone,'Stone_Platform',.004);for(let i=0;i<levels;i++){const h=tall/levels,rad=radius*(1-i/(levels+2)*.52);add(new THREE.CylinderGeometry(rad*.75,rad*.8,h*.72,8),i===0?materials.stone:materials.wood,'Tower_Level_'+(i+1),.008+i*h+h*.36);add(new THREE.CylinderGeometry(rad*.45,rad*1.14,h*.23,8),materials.roof,'Eaves_'+(i+1),.008+i*h+h*.83);add(new THREE.CylinderGeometry(rad*.85,rad*.85,.002,8),materials.gold,'Balcony_'+(i+1),.008+i*h+.004)}add(new THREE.ConeGeometry(radius*.2,.025,8),materials.gold,'Finial',tall+.022);return g}
@@ -490,9 +518,7 @@ function build(d, footprintData){
  rock.scale(.010, .005, .007);
  rock.rotateY(.38);
  rock.translate(rockX - .005, terrainAt(rockX - .005, rockZ + .011) + .003, rockZ + .011);
- const exposedRock = mat('Baoshi_Exposed_Rock', 0x978676);
- lighting.lightBaoshiSurface(exposedRock, 1.19);
- mesh(rock, exposedRock, 'Hama_Peak_Rock_Concept', groups.Landmarks);
+ mesh(rock, mat('Baoshi_Exposed_Rock', 0x978676), 'Hama_Peak_Rock_Concept', groups.Landmarks);
  const lanterns = buildStoneLanterns({ project, mesh, mat, materials });
  groups.Landmarks.add(lanterns.group);
  waterfrontViews.set('moon', [
