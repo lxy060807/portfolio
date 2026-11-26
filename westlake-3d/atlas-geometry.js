@@ -29,7 +29,7 @@ function footprintRing(coordinates, project, hole) {
   return ring;
 }
 
-export function createBuildingLayer(buildings, { project, terrainAt, inWater, excludedPoints }) {
+export function createBuildingLayer(buildings, { project, terrainAt, inWater, excludedPoints, onFacade }) {
   const group = new THREE.Group();
   const walls = { v: [], f: [] };
   const roofs = { v: [], f: [] };
@@ -67,6 +67,7 @@ export function createBuildingLayer(buildings, { project, terrainAt, inWater, ex
     for (const ring of rings) {
       for (let i = 0; i < ring.length; i++) {
         const [ax, az] = ring[i], [bx, bz] = ring[(i + 1) % ring.length];
+        if (ring === outer) onFacade(ax, az, bx, bz, top, footprintHeight);
         const start = walls.v.length / 3;
         walls.v.push(ax, bottom, az, bx, bottom, bz, bx, top, bz, ax, top, az);
         walls.f.push(start, start + 2, start + 1, start, start + 3, start + 2);

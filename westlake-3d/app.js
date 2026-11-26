@@ -282,7 +282,11 @@ function flyToPlace(i) {
   followTowerPresetOnResize = view?.id === 'all';
   controls.minDistance = view ? .0034 : .3;
   if (i === 0) {
-    fly(new THREE.Vector3(5.7, 6.8, 8.3), new THREE.Vector3(-.12, .05, .2));
+    if (document.documentElement.dataset.lighting === 'night') {
+      fly(new THREE.Vector3(-1.46, 5.9, 2.68), new THREE.Vector3(.36, .04, -.31));
+    } else {
+      fly(new THREE.Vector3(5.7, 6.8, 8.3), new THREE.Vector3(-.12, .05, .2));
+    }
   } else {
     const [x, z] = view ? [view.x, view.z] : project(place.c);
     const target = new THREE.Vector3(x, view?.y ?? terrainAt(x, z), z);
@@ -397,11 +401,12 @@ function build(d, footprintData){
  // Accurate shoreline tracing, kept thin so its visual weight does not obscure islands.
  const shore=[];for(const r of waters){for(let i=1;i<r.c.length;i++){const a=r.c[i-1],b=r.c[i];shore.push(a[0],.022,a[1],b[0],.022,b[1])}}
  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(shore,3));const sl=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:0xc1cba8}));sl.name='Shoreline';groups.Water.add(sl);
+ lighting.dimShoreline(sl.material);
  const greenRings=d.green.map(c=>ringInfo(c.map(project)));const roadGeo=[];
  for(const r of d.roads){if(r.tunnel||causewayWays.has(String(r.id)))continue;const pts=r.c.map(project),width=Math.min(.028,Math.max(.003,(r.widthM||({primary:18,secondary:14,tertiary:10,residential:7,unclassified:6,service:4,pedestrian:5}[r.kind]||2.5))*.001));const v=[],ind=[];for(let k=1;k<pts.length;k++){const a=pts[k-1],b=pts[k],len=Math.hypot(b[0]-a[0],b[1]-a[1]);if(len>.8||!len)continue;const steps=Math.max(1,Math.ceil(len/.018));for(let t=0;t<steps;t++){const ax=a[0]+(b[0]-a[0])*t/steps,az=a[1]+(b[1]-a[1])*t/steps,bx=a[0]+(b[0]-a[0])*(t+1)/steps,bz=a[1]+(b[1]-a[1])*(t+1)/steps;if(ax<xmin||ax>xmax||az<zmin||az>zmax)continue;if(r.kind==="footway"&&nearBridge((ax+bx)/2,(az+bz)/2,.038)&&inWater((ax+bx)/2,(az+bz)/2))continue;const dx=(bz-az)/len*steps*width/2,dz=-(bx-ax)/len*steps*width/2;const h=(x,z)=>Math.max(terrainAt(x,z)+.005,r.bridge?.054:0);const o=v.length/3;v.push(ax+dx,h(ax+dx,az+dz),az+dz,ax-dx,h(ax-dx,az-dz),az-dz,bx+dx,h(bx+dx,bz+dz),bz+dz,bx-dx,h(bx-dx,bz-dz),bz-dz);ind.push(o,o+1,o+2,o+1,o+3,o+2)}}if(v.length)roadGeo.push(makeGeometry(v,ind))}
  merged(roadGeo,materials.road,'OSM_Road_Network',groups.Roads);
  const causeways = buildCauseways(causewayLayout, { terrainAt, mesh, mat, materials });
- lighting.addLanterns(d.roads, causewayWays, project, terrainAt);
+ lighting.populateRoads(d.roads, causewayWays, project, terrainAt, inWater, d.bbox);
  for (const {id, group, bridges, planting} of causeways) {
    group.traverse(object => {
      if (object.material?.isMeshStandardMaterial) {
@@ -418,9 +423,14 @@ function build(d, footprintData){
  const broken = waterfrontViews.get('baidi').find(view => view.name === 'Broken');
  waterfrontViews.set('duanqiao', [broken]);
  const landmarkPoints = ['leifeng', 'baochu'].map(id => project(places.find(place => place.id === id).c));
+ const [cityEast, citySouth] = project([120.148, 30.227]);
+ const [cityNorthwest, cityNorth] = project([120.116, 30.266]);
+ const urbanLimits = [cityEast, citySouth, cityNorth, cityNorthwest];
  const buildings = createBuildingLayer(footprintData.buildings, {
-   project, terrainAt, inWater, excludedPoints: landmarkPoints.map(([x,z], i) => [x,z,i === 0 ? .029 : .012])
+   project, terrainAt, inWater, excludedPoints: landmarkPoints.map(([x,z], i) => [x,z,i === 0 ? .029 : .012]),
+   onFacade: (ax, az, bx, bz, top, height) => lighting.addFacade(ax, az, bx, bz, top, height, urbanLimits)
  });
+ lighting.finishFacades();
  groups.Buildings.add(buildings.group);
  buildings.group.traverse(object => {
    if (object.material?.isMeshStandardMaterial) {
@@ -445,7 +455,8 @@ function build(d, footprintData){
  });
  // Named landmarks are deliberately stylized volumes, separate and editable in Blender.
  function pagoda(name,c,levels,tall,radius){const g=new THREE.Group();g.name=name;const[x,z]=project(c),y=terrainAt(x,z);g.position.set(x,y+.006,z);groups.Landmarks.add(g);const add=(geo,m,n,h)=>{geo.translate(0,h,0);return mesh(geo,m,n,g)};add(new THREE.CylinderGeometry(radius*1.3,radius*1.4,.008,8),materials.stone,'Stone_Platform',.004);for(let i=0;i<levels;i++){const h=tall/levels,rad=radius*(1-i/(levels+2)*.52);add(new THREE.CylinderGeometry(rad*.75,rad*.8,h*.72,8),i===0?materials.stone:materials.wood,'Tower_Level_'+(i+1),.008+i*h+h*.36);add(new THREE.CylinderGeometry(rad*.45,rad*1.14,h*.23,8),materials.roof,'Eaves_'+(i+1),.008+i*h+h*.83);add(new THREE.CylinderGeometry(rad*.85,rad*.85,.002,8),materials.gold,'Balcony_'+(i+1),.008+i*h+.004)}add(new THREE.ConeGeometry(radius*.2,.025,8),materials.gold,'Finial',tall+.022);return g}
- pagoda('Leifeng_Pagoda_Concept', places[4].c, 5, .057, .018);
+ const leifeng = pagoda('Leifeng_Pagoda_Concept', places[4].c, 5, .057, .018);
+ lighting.lightLandmark(leifeng, 0xf0ab55, 1.03);
  const [towerX, towerZ] = project(places[5].c);
  const tower = new THREE.Group();
  tower.name = 'Baochu_Pagoda_Brick_Octagon';
@@ -467,6 +478,7 @@ function build(d, footprintData){
  const finial = new THREE.ConeGeometry(.0014, .004, 8);
  finial.translate(0, .043, 0);
  mesh(finial, materials.roof, 'Tower_Finial', tower);
+ lighting.lightLandmark(tower, 0xffe0b5, 1.37);
  const [rockX, rockZ] = project(places[6].c);
  const rock = new THREE.DodecahedronGeometry(1, 0);
  rock.scale(.010, .005, .007);
@@ -771,7 +783,7 @@ function animate(now) {
   controls.update();
   const near = THREE.MathUtils.clamp(controls.getDistance() * .026, .00015, .008);
   if (camera.near !== near) { camera.near = near; camera.updateProjectionMatrix(); }
-  lighting.update(now, camera);
+  lighting.update(now, camera, groups);
   renderer.render(scene, camera);
   $('#compass').style.transform = 'rotate(' + (-controls.getAzimuthalAngle() * 180 / Math.PI) + 'deg)';
   updateLabels();

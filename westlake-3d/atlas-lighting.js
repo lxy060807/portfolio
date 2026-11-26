@@ -10,10 +10,10 @@ const presets = {
     horizon: 0xbdcddd, fog: [10, 26, .68, 5.8], rain: 0, snow: 0, theme: '#eef2ef'
   },
   night: {
-    sky: 0x182538, hemisphere: 0x9dbfff, ground: 0x394759, ambient: .87,
-    key: 0xb8ceff, direct: 1.44, position: [-3.3, 6.2, -3.7], fill: 0xffc38d, fillPower: .31,
-    water: 0x315675, exposure: 1.12, blend: 1, shadowBias: -.00016, shadowNormalBias: .012,
-    horizon: 0x182538, fog: [10, 26, .68, 5.8], rain: 0, snow: 0, theme: '#152330'
+    sky: 0x080d17, hemisphere: 0x9fb6dd, ground: 0x302c36, ambient: .19,
+    key: 0xb2c7e7, direct: .27, position: [-3.3, 6.2, -3.7], fill: 0xe6b68e, fillPower: .065,
+    water: 0x1c2936, exposure: .85, blend: 1, shadowBias: -.00016, shadowNormalBias: .008,
+    horizon: 0x101622, fog: [13, 29, 1.8, 8.5], rain: 0, snow: 0, theme: '#152330'
   },
   rain: {
     sky: 0xa0b2b3, hemisphere: 0xd0dfe2, ground: 0x667568, ambient: 1.93,
@@ -29,12 +29,14 @@ const presets = {
   }
 };
 
-function addWaterLight(material, time, night, lightDirection, skyView, weather) {
+const shoreReflectionCount = 8;
+
+function addWaterLight(material, time, night, lightDirection, skyView, weather, shoreLights) {
   material.roughness = .27;
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, {
       lakeTime: time, nightMix: night, lakeLight: lightDirection, lakeSky: skyView,
-      lakeRain: weather.rain, lakeSnow: weather.snow
+      lakeRain: weather.rain, lakeSnow: weather.snow, shoreLights
     });
     shader.vertexShader = 'varying vec3 lakePosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', `
       #include <begin_vertex>
@@ -46,6 +48,7 @@ function addWaterLight(material, time, night, lightDirection, skyView, weather) 
       uniform vec3 lakeLight;
       uniform float lakeSky;
       uniform float lakeRain, lakeSnow;
+      uniform vec4 shoreLights[${shoreReflectionCount}];
       varying vec3 lakePosition;
       float rainCell(vec2 cell) {
         return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
@@ -87,13 +90,29 @@ function addWaterLight(material, time, night, lightDirection, skyView, weather) 
       float sheen = pow(1.0 - clamp(lakeEye.y, 0.0, 1.0), 3.0);
       vec3 lightHalf = normalize(lakeEye + lakeLight);
       float glint = pow(max(dot(rippleNormal, lightHalf), 0.0), mix(34.0, 44.0, nightMix));
-      vec3 reflectedSky = mix(vec3(.36, .53, .61), vec3(.12, .24, .46), nightMix);
+      vec3 reflectedSky = mix(vec3(.36, .53, .61), vec3(.032, .054, .090), nightMix);
       vec3 glintColor = mix(vec3(1.0, .81, .52), vec3(.36, .55, .92), nightMix);
       reflectedSky = mix(reflectedSky, vec3(.42, .52, .55), lakeRain);
       reflectedSky = mix(reflectedSky, vec3(.54, .62, .72), lakeSnow);
       glintColor = mix(glintColor, reflectedSky * .72, max(lakeRain, lakeSnow) * .87);
-      float glintStrength = mix(mix(.37, .28, nightMix), .12, max(lakeRain, lakeSnow));
+      float glintStrength = mix(mix(.37, .035, nightMix), .12, max(lakeRain, lakeSnow));
       outgoingLight += reflectedSky * (.028 + sheen * .22) + glintColor * glint * glintStrength;
+      if (nightMix > .001) {
+        vec2 toEye = normalize(lakeEye.xz + vec2(.0001));
+        vec2 crossView = vec2(-toEye.y, toEye.x);
+        float reflections = 0.0;
+        for (int i = 0; i < ${shoreReflectionCount}; i++) {
+          vec4 source = shoreLights[i];
+          float height = max(.007, source.y - lakePosition.y);
+          float mirror = height / (height + max(.001, cameraPosition.y - lakePosition.y));
+          vec2 offset = p - mix(source.xz, cameraPosition.xz, mirror);
+          float streak = dot(offset, toEye) / mix(.022, .092, sheen);
+          float across = dot(offset, crossView) / .008 + rippleNormal.x * 17.0;
+          reflections += exp(-across * across - streak * streak) * source.w;
+        }
+        float ripple = .56 + .44 * sin(dot(p, toEye) * 640.0 + cos(p.x * 190.0) + lakeTime * .85);
+        outgoingLight += vec3(1.0, .57, .23) * nightMix * reflections * mix(.012, .17, sheen) * ripple;
+      }
       #include <opaque_fragment>
     `);
   };
@@ -150,8 +169,8 @@ function createSkyDome(time, night, lightDirection, weather) {
         vec3 rainSky = mix(vec3(.53, .64, .65), vec3(.18, .26, .30), elevation * .25 + banks * .75);
         vec3 snowSky = mix(vec3(.70, .79, .87), vec3(.37, .46, .57), elevation * .56 + banks * .44);
         day = mix(mix(day, rainSky, rain), snowSky, snow);
-        vec3 afterDark = mix(vec3(.047, .081, .135), vec3(.012, .025, .067), blue);
-        afterDark = mix(afterDark, vec3(.095, .143, .203), cloud * .5);
+        vec3 afterDark = mix(vec3(.015, .022, .038), vec3(.002, .005, .014), blue);
+        afterDark = mix(afterDark, vec3(.027, .035, .050), cloud * .43);
         gl_FragColor = vec4(mix(day, afterDark, night), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -173,12 +192,15 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   const weather = createWeather(scene, renderer, reduced);
   const dome = createSkyDome(time, night, lightDirection, weather);
   scene.add(dome);
-  addWaterLight(water, time, night, lightDirection, skyView, weather);
+  const shoreLights = { value: Array.from({ length: shoreReflectionCount }, () => new THREE.Vector4()) };
+  addWaterLight(water, time, night, lightDirection, skyView, weather, shoreLights);
   const lanterns = new THREE.Group();
-  lanterns.name = 'Night_Lighting_Preview';
+  lanterns.name = 'Mapped_Night_Lighting';
   lanterns.visible = false;
   scene.add(lanterns);
-  const lanternIntensity = { value: 0 };
+  const landmarkMaterials = [];
+  const facadeLights = { positions: [], styles: [] };
+  let shoreline, facadeLayer, streetLayer;
 
   let rendered, transition;
   function updateFog() {
@@ -207,8 +229,9 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
     updateFog();
     renderer.toneMappingExposure = p.exposure;
     night.value = p.blend;
-    lanternIntensity.value = p.blend;
     lanterns.visible = p.blend > .01;
+    if (shoreline) shoreline.opacity = 1 - .91 * p.blend;
+    for (const [material, strength] of landmarkMaterials) material.emissiveIntensity = strength * p.blend;
     weather.rain.value = p.rain;
     weather.snow.value = p.snow;
   }
@@ -236,47 +259,189 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
     return frame;
   }
 
-  function addLanterns(roads, causewayWays, project, terrainAt) {
-    const positions = [];
+  const seedAt = (x, z) => {
+    const noise = Math.sin(x * 781.71 + z * 1231.53) * 10312.715;
+    return noise - Math.floor(noise);
+  };
+  const isCity = ([lon, lat]) => (lon > 120.148 && lat > 30.227) || (lat > 30.266 && lon > 120.116);
+  const center = new THREE.Vector2();
+  const mix = THREE.MathUtils.lerp;
+
+  function addFacade(ax, az, bx, bz, top, height, urbanLimits) {
+    const [east, south, north, northwest] = urbanLimits;
+    if (!((ax > east && az < south) || (az < north && ax > northwest))) return;
+    const length = Math.hypot(bx - ax, bz - az);
+    if (length < .006 || seedAt(ax, az) < .24) return;
+    const columns = Math.min(9, Math.max(1, Math.ceil(length / .011)));
+    const floors = Math.min(10, Math.max(1, Math.round(height / .009)));
+    for (let col = 0; col < columns; col++) {
+      const offset = (col + .5) / columns;
+      // Move outside the wall very slightly so the illuminated windows depth-test against the building.
+      const x = mix(ax, bx, offset) + (bz - az) / length * .00035;
+      const z = mix(az, bz, offset) - (bx - ax) / length * .00035;
+      for (let floor = 0; floor < floors; floor++) {
+        const seed = seedAt(x + floor * .014, z);
+        if (seed < .48) continue;
+        facadeLights.positions.push(x, top - height * (floor + .45) / floors, z);
+        facadeLights.styles.push(.19 + seed * .52, .90 + seed * .37, .35 + seed * .59);
+      }
+    }
+  }
+
+  function addPoints({ positions, styles }, name) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('lamp', new THREE.Float32BufferAttribute(styles, 3));
+    const material = new THREE.ShaderMaterial({
+      uniforms: { night, pointScale: { value: renderer.getPixelRatio() * (renderer.getSize(center).x < 600 ? .8 : 1) } },
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `
+        uniform float pointScale;
+        attribute vec3 lamp;
+        varying vec3 lampStyle;
+        void main() {
+          lampStyle = lamp;
+          vec4 view = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * view;
+          gl_PointSize = pointScale * clamp(lamp.y * (2.2 + 13.0 / max(-view.z, .15)), 1.8, 13.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float night;
+        varying vec3 lampStyle;
+        void main() {
+          float r = length(gl_PointCoord - .5) * 2.0;
+          float halo = exp(-r * r * 5.8) * (1.0 - smoothstep(.60, .98, r)) * .34;
+          float core = exp(-r * r * 22.0) * .92;
+          vec3 color = mix(vec3(1.0, .63, .30), vec3(1.0, .94, .81), lampStyle.z);
+          gl_FragColor = vec4(color, min(1.0, (halo + core) * night * lampStyle.x));
+        }
+      `
+    });
+    const points = new THREE.Points(geometry, material);
+    points.name = name;
+    lanterns.add(points);
+    return points;
+  }
+
+  function populateRoads(roads, causewayWays, project, terrainAt, inWater, bounds) {
+    const street = { positions: [], styles: [] }, hillside = { positions: [], styles: [] };
+    const hillWash = [];
+    const shore = [];
+    const take = new Set();
+    const [west, south, east, north] = bounds;
     for (const way of roads) {
+      if (way.tunnel || Number(way.layer) < 0) continue;
       const causeway = causewayWays.has(String(way.id));
-      if (!causeway && !['primary', 'secondary', 'tertiary', 'residential', 'pedestrian'].includes(way.kind)) continue;
+      const waterfront = /^(北山街|湖滨路|南山路|孤山路|杨公堤)$/.test(way.name);
+      const mountain = ['589666433', '706869403', '706869404'].includes(String(way.id)) ||
+        /^(宝石山上路|宝石山下一弄|保俶塔前山路|葛岭路)$/.test(way.name);
+      const trunk = /^(trunk|primary|secondary)(_link)?$/.test(way.kind);
+      const local = /^(tertiary|residential|unclassified|living_street|pedestrian|service)$/.test(way.kind);
+      if (!(causeway || waterfront || mountain || trunk || local)) continue;
+      const spacing = mountain ? .043 : causeway ? .060 : waterfront ? .026 : trunk ? .020 : .027;
+      let next = spacing * (.35 + .5 * seedAt(...way.c[0]));
       for (let i = 1; i < way.c.length; i++) {
-        const [ax, az] = project(way.c[i - 1]), [bx, bz] = project(way.c[i]);
-        const spacing = causeway ? .036 : .043;
-        const count = Math.floor(Math.hypot(bx - ax, bz - az) / spacing);
-        for (let j = 0; j < count; j++) {
-          const mix = (j + .58) / count;
-          const x = THREE.MathUtils.lerp(ax, bx, mix), z = THREE.MathUtils.lerp(az, bz, mix);
+        const from = way.c[i - 1], to = way.c[i];
+        const [ax, az] = project(from), [bx, bz] = project(to);
+        const length = Math.hypot(bx - ax, bz - az);
+        if (length > .8) { next = spacing; continue; }
+        for (; next < length; next += spacing) {
+          const fraction = next / length;
+          const lon = mix(from[0], to[0], fraction), lat = mix(from[1], to[1], fraction);
+          if (lon < west || lon > east || lat < south || lat > north) continue;
+          const urban = isCity([lon, lat]);
+          const seed = seedAt(lon, lat);
+          if (!(causeway || waterfront || mountain || urban || (trunk && seed > .58))) continue;
+          if (way.kind === 'service' && seed < .68) continue;
+          const x = mix(ax, bx, fraction), z = mix(az, bz, fraction);
+          if (!causeway && !way.bridge && inWater(x, z)) continue;
           const h = terrainAt(x, z);
-          if (causeway || (x > .46 && h > .024)) positions.push(x, Math.max(h, .026) + .005, z);
+          if (!mountain && !waterfront && !causeway && h > .115) continue;
+          const key = `${Math.round(x / .011)}:${Math.round(z / .011)}`;
+          if (take.has(key)) continue;
+          take.add(key);
+          const y = Math.max(h + (trunk ? .012 : .009), way.bridge ? .064 : .032);
+          const target = mountain ? hillside : street;
+          target.positions.push(x, y, z);
+          const strength = (mountain ? .43 : causeway ? .34 : waterfront ? .88 : trunk ? 1.13 : .66) * (.64 + .58 * seed);
+          target.styles.push(strength, trunk ? 1.35 : waterfront ? 1.18 : 1.00, mountain ? .68 : waterfront ? .19 : seed * .67);
+          if (mountain && h > .083 && seed > .38) hillWash.push([x, z, .033 + seed * .026]);
+          if (waterfront && [0, 1, 2, 3].some(n => inWater(x + .033 * Math.cos(n * Math.PI / 2), z + .033 * Math.sin(n * Math.PI / 2)))) {
+            shore.push([x, y, z, strength]);
+          }
+        }
+        next -= length;
+      }
+    }
+    // Keep reflection sources distinct and directly attached to the mapped shoreline corridors.
+    const reflectionSources = [];
+    for (const source of shore.sort((a, b) => b[3] - a[3])) {
+      if (reflectionSources.some(other => Math.hypot(source[0] - other[0], source[2] - other[2]) < .35)) continue;
+      shoreLights.value[reflectionSources.length].set(...source);
+      reflectionSources.push(source);
+      if (reflectionSources.length === shoreReflectionCount) break;
+    }
+    streetLayer = addPoints(street, 'Mapped_Street_Lights');
+    addPoints(hillside, 'Baoshi_Access_Lights');
+    const positions = [], falloff = [], indices = [];
+    const divisions = 12;
+    for (const [x, z, radius] of hillWash) {
+      for (let row = 0; row <= divisions; row++) {
+        for (let column = 0; column <= divisions; column++) {
+          const u = column / divisions * 2 - 1, v = row / divisions * 2 - 1;
+          const px = x + u * radius, pz = z + v * radius;
+          const index = positions.length / 3;
+          positions.push(px, terrainAt(px, pz) + .006, pz);
+          falloff.push(Math.max(0, 1 - u * u - v * v) ** 2);
+          if (row && column) indices.push(index, index - divisions - 1, index - 1, index - 1, index - divisions - 1, index - divisions - 2);
         }
       }
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('falloff', new THREE.Float32BufferAttribute(falloff, 1));
+    geometry.setIndex(indices);
     const material = new THREE.ShaderMaterial({
-      uniforms: { lampStrength: lanternIntensity, pixelRatio: { value: renderer.getPixelRatio() } },
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { night }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: `
-        uniform float pixelRatio;
-        void main() {
-          vec4 view = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * view;
-          gl_PointSize = pixelRatio * clamp(19.0 / max(-view.z, .25), 2.7, 15.0);
-        }
+        attribute float falloff;
+        varying float groundLight;
+        void main() { groundLight = falloff; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
       `,
       fragmentShader: `
-        uniform float lampStrength;
-        void main() {
-          float r = length(gl_PointCoord - .5) * 2.0;
-          float halo = (1.0 - smoothstep(.09, .93, r)) * .22;
-          float core = (1.0 - smoothstep(0.0, .30, r)) * .75;
-          gl_FragColor = vec4(vec3(1.0, .71, .35), (halo + core) * lampStrength);
-        }
+        uniform float night;
+        varying float groundLight;
+        void main() { gl_FragColor = vec4(.84, .78, .64, groundLight * night * .31); }
       `
     });
-    lanterns.add(new THREE.Points(geometry, material));
+    const wash = new THREE.Mesh(geometry, material);
+    wash.name = 'Baoshi_Ridge_Light_Wash';
+    lanterns.add(wash);
+  }
+
+  function lightLandmark(object, color, strength) {
+    const replacements = new Map();
+    object.traverse(child => {
+      if (!child.isMesh) return;
+      const original = child.material;
+      if (!replacements.has(original)) {
+        const material = original.clone();
+        material.emissive.set(color).lerp(original.color, .38);
+        material.emissiveIntensity = 0;
+        material.onBeforeCompile = shader => {
+          shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `
+            #include <emissivemap_fragment>
+            vec3 worldNormal = inverseTransformDirection(normal, viewMatrix);
+            float facadeLight = smoothstep(-.76, .65, dot(worldNormal, normalize(vec3(.41, -.27, .89))));
+            totalEmissiveRadiance *= mix(.18, 1.0, facadeLight);
+          `);
+        };
+        replacements.set(original, material);
+        landmarkMaterials.push([material, strength]);
+      }
+      child.material = replacements.get(original);
+    });
   }
 
   const menu = document.querySelector('#lighting-options');
@@ -288,14 +453,16 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
   }
   apply('day');
   return {
-    addLanterns,
+    addFacade, populateRoads, lightLandmark,
+    finishFacades() { facadeLayer = addPoints(facadeLights, 'Mapped_Facade_Windows'); },
+    dimShoreline(material) { shoreline = material; shoreline.transparent = true; shoreline.depthWrite = false; },
     weatherSurface: weather.surface,
     showSky(visible) {
       dome.visible = visible;
       skyView.value = visible ? 1 : 0;
       updateFog();
     },
-    update(now, camera) {
+    update(now, camera, layers) {
       if (transition) {
         const elapsed = THREE.MathUtils.clamp((now - transition.start) / 480, 0, 1);
         renderLighting(elapsed === 1 ? transition.to : tween(transition.from, transition.to, 1 - (1 - elapsed) ** 3));
@@ -304,6 +471,10 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       if (!reduced) time.value = now / 1000;
       weather.update(time.value);
       if (dome.visible) dome.position.copy(camera.position);
+      if (lanterns.visible && facadeLayer && streetLayer) {
+        facadeLayer.visible = layers.Buildings.visible;
+        streetLayer.visible = layers.Roads.visible;
+      }
     }
   };
 }
