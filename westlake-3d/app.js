@@ -34,6 +34,10 @@ scene.add(tripLayer);
 const mat=(name,color,extra={})=>{const m=new THREE.MeshStandardMaterial({color,roughness:.85,...extra});m.name=name;return m};
 const materials={earth:mat('Terrain_Green',0xffffff,{vertexColors:true}),water:mat('Lake_Jade',0x589f91,{roughness:.3,metalness:.12}),stone:mat('Shore_PaleStone',0xcbd1b5),road:mat('Paths_Limestone',0xe6ddc1),city:mat('Buildings_Porcelain',0xe9e7d9),roof:mat('Roof_CharcoalJade',0x44594d),wood:mat('Timber_Warm',0x947354),gold:mat('Pagoda_Bronze',0x9c8050,{metalness:.25,roughness:.52}),base:mat('Cut_Base',0xb7c2a9)};
 const lighting = createLighting({ scene, renderer, hemisphere, sun, fill, water: materials.water, reduced });
+for (const [material, coverage, wetness] of [
+  [materials.earth, .94, .77], [materials.road, .53, .91], [materials.stone, .75, .85],
+  [materials.roof, .96, .8], [materials.wood, .28, .7]
+]) lighting.weatherSurface(material, coverage, wetness);
 const mesh=(geo,material,name,group)=>{const m=new THREE.Mesh(geo,material);m.name=name;m.castShadow=true;m.receiveShadow=true;group.add(m);return m};
 const px=96.16,pz=111.32,origin=[120.142,30.248];
 const project=c=>[(c[0]-origin[0])*px,-(c[1]-origin[1])*pz];
@@ -318,6 +322,40 @@ function compactUntextured(geometry) {
   geometry.dispose();
   return compact;
 }
+function addLakeBoats() {
+  const outline = new THREE.Shape();
+  outline.moveTo(0, -.011);
+  outline.quadraticCurveTo(.0038, -.007, .0038, -.002);
+  outline.lineTo(.0033, .0075);
+  outline.quadraticCurveTo(0, .0105, -.0033, .0075);
+  outline.lineTo(-.0038, -.002);
+  outline.quadraticCurveTo(-.0038, -.007, 0, -.011);
+  const hull = new THREE.ExtrudeGeometry(outline, {
+    depth: .0017, bevelEnabled: true, bevelThickness: .00038, bevelSize: .0005, bevelSegments: 1, curveSegments: 6
+  }).rotateX(-Math.PI / 2);
+  const roof = makeGeometry([
+    -.0036,.0051,-.0059, -.002,.0061,-.006, 0,.0065,-.0061, .002,.0061,-.006, .0036,.0051,-.0059,
+    -.0036,.0051,.0059, -.002,.0061,.006, 0,.0065,.0061, .002,.0061,.006, .0036,.0051,.0059
+  ], [0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,8,3,8,4,4,8,9]);
+  const post = new THREE.BoxGeometry(.00042,.0036,.00042);
+  const deck = new THREE.BoxGeometry(.0065,.00045,.014);
+  for (const coordinate of [[120.146,30.248],[120.147,30.241],[120.140,30.246],[120.151,30.250]]) {
+    const [x,z] = project(coordinate);
+    if (!inWater(x,z)) continue;
+    const boat = new THREE.Group();
+    boat.name = 'Covered_Lake_Boat';
+    boat.position.set(x,.0204,z);
+    boat.rotation.y = .38 + (z + 1) * .42;
+    groups.Water.add(boat);
+    mesh(hull,materials.wood,'Tapered_Hull',boat);
+    mesh(deck,materials.stone,'Deck',boat).position.y = .0018;
+    mesh(roof,materials.roof,'Cambered_Canopy',boat);
+    for (const side of [-1,1]) for (const row of [-1,0,1]) {
+      mesh(post,materials.wood,'Canopy_Post',boat).position.set(side * .0027,.0034,row * .00465);
+    }
+  }
+}
+
 function build(d, footprintData){
  const n=d.size,[west,south,east,north]=d.bbox;const[xmin,zmax]=project([west,south]),[xmax,zmin]=project([east,north]);
  const waters=d.water.map(r=>({...ringInfo(r.c.map(project)),role:r.role})),outer=waters.filter(r=>r.role==='outer'),inner=waters.filter(r=>r.role==='inner');
@@ -365,6 +403,11 @@ function build(d, footprintData){
  const causeways = buildCauseways(causewayLayout, { terrainAt, mesh, mat, materials });
  lighting.addLanterns(d.roads, causewayWays, project, terrainAt);
  for (const {id, group, bridges, planting} of causeways) {
+   group.traverse(object => {
+     if (object.material?.isMeshStandardMaterial) {
+       lighting.weatherSurface(object.material, /Lawn|Stone/.test(object.material.name) ? .85 : .55, .86);
+     }
+   });
    groups.Roads.add(group);
    groups.Trees.add(planting);
    waterfrontViews.set(id, bridges.map(bridge => ({
@@ -379,6 +422,11 @@ function build(d, footprintData){
    project, terrainAt, inWater, excludedPoints: landmarkPoints.map(([x,z], i) => [x,z,i === 0 ? .029 : .012])
  });
  groups.Buildings.add(buildings.group);
+ buildings.group.traverse(object => {
+   if (object.material?.isMeshStandardMaterial) {
+     lighting.weatherSurface(object.material, object.name.includes('Roof') ? 1 : .25, .61);
+   }
+ });
  const routes = readTrails(d.roads);
  mappedRoutes = routes.map(route => ({route, geometry: createTrailLayer(route, project, terrainAt)}));
  routeNetwork = createTrailOverview(routes, project, terrainAt);
@@ -392,6 +440,9 @@ function build(d, footprintData){
  const trunkBase=compactUntextured(new THREE.CylinderGeometry(.0014,.002,.014,5));
  let count=0;for(let t=0;t<55000&&count<3750;t++){const x=xmin+.03+rand()*(xmax-xmin-.06),z=zmin+.03+rand()*(zmax-zmin-.06),y=terrainAt(x,z);if(inWater(x,z)||landmarkPoints.some(p=>Math.hypot(x-p[0],z-p[1])<.05)||buildings.nearbyFootprints(x,z).some(r=>inPoly(x,z,r))||nearRoute(x,z))continue;if(!greenRings.some(r=>inPoly(x,z,r))&&!(y>.13&&x<.8))continue;const s=.009+rand()*.009;const c=treeBase.clone();c.scale(s,s*(1.15+rand()*.4),s);c.rotateY(rand()*6.28);c.translate(x,y+s+.01,z);crowns[count%3].push(c);const tr=trunkBase.clone();tr.translate(x,y+.007,z);trunks.push(tr);count++}
  for(let i=0;i<3;i++)merged(crowns[i],treeMats[i],'Canopy_'+i,groups.Trees);merged(trunks,materials.wood,'Tree_Trunks',groups.Trees);treeBase.dispose();trunkBase.dispose();
+ groups.Trees.traverse(object => {
+   if (object.material?.isMeshStandardMaterial) lighting.weatherSurface(object.material, .78, .55);
+ });
  // Named landmarks are deliberately stylized volumes, separate and editable in Blender.
  function pagoda(name,c,levels,tall,radius){const g=new THREE.Group();g.name=name;const[x,z]=project(c),y=terrainAt(x,z);g.position.set(x,y+.006,z);groups.Landmarks.add(g);const add=(geo,m,n,h)=>{geo.translate(0,h,0);return mesh(geo,m,n,g)};add(new THREE.CylinderGeometry(radius*1.3,radius*1.4,.008,8),materials.stone,'Stone_Platform',.004);for(let i=0;i<levels;i++){const h=tall/levels,rad=radius*(1-i/(levels+2)*.52);add(new THREE.CylinderGeometry(rad*.75,rad*.8,h*.72,8),i===0?materials.stone:materials.wood,'Tower_Level_'+(i+1),.008+i*h+h*.36);add(new THREE.CylinderGeometry(rad*.45,rad*1.14,h*.23,8),materials.roof,'Eaves_'+(i+1),.008+i*h+h*.83);add(new THREE.CylinderGeometry(rad*.85,rad*.85,.002,8),materials.gold,'Balcony_'+(i+1),.008+i*h+.004)}add(new THREE.ConeGeometry(radius*.2,.025,8),materials.gold,'Finial',tall+.022);return g}
  pagoda('Leifeng_Pagoda_Concept', places[4].c, 5, .057, .018);
@@ -477,7 +528,7 @@ function build(d, footprintData){
    addEntranceMarker(route, route.name, route.legs[0].coordinates[0]);
    if (route.reference) addEntranceMarker(route, route.reference.name, route.reference.coordinates, true);
  }
- const boatGeo=[],boatCabins=[];for(const c of [[120.146,30.248],[120.147,30.241],[120.140,30.246],[120.151,30.250]]){const[x,z]=project(c);if(!inWater(x,z))continue;let g=new THREE.BoxGeometry(.012,.004,.032);g.rotateY(.5);g.translate(x,.024,z);boatGeo.push(g);g=new THREE.BoxGeometry(.009,.006,.015);g.rotateY(.5);g.translate(x,.029,z);boatCabins.push(g)}merged(boatGeo,materials.wood,'Illustrative_Boats',groups.Water);merged(boatCabins,materials.stone,'Boat_Cabins',groups.Water);
+ addLakeBoats();
  const waterfront = {
    causeways: causeways.map(({id, bridges}) => ({id, bridges: bridges.map(({id,label,x,z,span}) => ({id,label,x,z,span}))})),
    stonePagodas: lanterns.features.map(({id,x,y,z,height}) => ({id,x,y,z,height, inWater: inWater(x,z)}))
