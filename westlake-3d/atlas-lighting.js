@@ -380,49 +380,38 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
     streetLayer = addPoints(street, 'Mapped_Street_Lights');
   }
 
-  function addBaoshiTreeLights(paths, terrainAt, canPlant) {
+  function addBaoshiTreeLights(bounds, terrainAt, canPlant) {
     const lights = { positions: [], styles: [] };
     const trees = [], pools = [];
-    for (const [pathIndex, path] of paths.entries()) {
-      const branch = pathIndex > 0;
-      let next = branch ? .019 + .026 * seedAt(...path[0]) : .009;
-      for (let i = 1; i < path.length; i++) {
-        const [ax, az] = path[i - 1], [bx, bz] = path[i];
-        const length = Math.hypot(bx - ax, bz - az);
-        while (next < length) {
-          const x = mix(ax, bx, next / length), z = mix(az, bz, next / length);
-          const seed = seedAt(x, z), spread = seedAt(x + .49, z - .71);
-          next += branch ? .042 + seed * .046 : .019 + seed * .029;
-          const distance = .009 + spread * spread * .024;
-          const side = seedAt(x - .27, z + .16) < .5 ? -1 : 1;
-          const dx = (bz - az) / length * distance * side;
-          const dz = (ax - bx) / length * distance * side;
-          const sign = canPlant(x + dx, z + dz) ? 1 : -1;
-          const tx = x + dx * sign, tz = z + dz * sign;
-          if (!canPlant(tx, tz) || trees.some(({x: px, z: pz}) => (px - tx) ** 2 + (pz - tz) ** 2 < .018 ** 2)) continue;
-          const y = terrainAt(tx, tz);
-          const size = .0088 + seed * .004;
-          const reach = Math.min(.88, size / distance);
-          const lampX = mix(tx, x, reach), lampY = y + size * 1.58, lampZ = mix(tz, z, reach);
-          trees.push({ x: tx, z: tz, y, size, lampX, lampY, lampZ });
-          lights.positions.push(lampX, lampY, lampZ);
-          lights.styles.push(.64 + seed * .73, 1.05 + seed * .52, .22 + spread * .44);
-          const spill = Math.min(.72, .014 / distance);
-          pools.push([mix(tx, x, spill), mix(tz, z, spill), .008 + seed * .006]);
-        }
-        next -= length;
-      }
+    const [minX, minZ, maxX, maxZ] = bounds;
+    // Scatter across the wooded terrain independently of the trail network.
+    for (let i = 0; i < 2400 && trees.length < 64; i++) {
+      const x = mix(minX, maxX, seedAt(i + .14, .27));
+      const z = mix(minZ, maxZ, seedAt(i + .91, .68));
+      const y = terrainAt(x, z);
+      if (!canPlant(x, z, y)) continue;
+      const seed = seedAt(x, z), tint = seedAt(x + .49, z - .71);
+      const gap = .031 + seed * .037;
+      if (trees.some(tree => (tree.x - x) ** 2 + (tree.z - z) ** 2 < Math.max(gap, tree.gap) ** 2)) continue;
+      const size = .007 + seed * .004;
+      const angle = seedAt(x - .27, z + .16) * Math.PI * 2;
+      const dx = Math.cos(angle) * size * .84, dz = Math.sin(angle) * size * .84;
+      const lampX = x + dx, lampY = y + size * 1.58, lampZ = z + dz;
+      trees.push({ x, z, y, size, lampX, lampY, lampZ, gap });
+      lights.positions.push(lampX, lampY, lampZ);
+      lights.styles.push(.75 + seed * .49, .93 + seed * .42, .20 + tint * .53);
+      pools.push([lampX, lampZ, .008 + seed * .006]);
     }
     const bulbs = addPoints(lights, 'Baoshi_Tree_Lights');
     bulbs.userData.trees = trees;
     baoshiLayer = new THREE.Group();
     baoshiLayer.name = 'Baoshi_Woodland_Lighting';
-    baoshiLayer.add(bulbs, createTrailLightPools(pools, terrainAt));
+    baoshiLayer.add(bulbs, createWoodlandLightPools(pools, terrainAt));
     lanterns.add(baoshiLayer);
     return trees;
   }
 
-  function createTrailLightPools(pools, terrainAt) {
+  function createWoodlandLightPools(pools, terrainAt) {
     const positions = [], falloff = [], indices = [];
     const divisions = 6;
     for (const [x, z, radius] of pools) {
@@ -455,7 +444,7 @@ export function createLighting({ scene, renderer, hemisphere, sun, fill, water, 
       `
     });
     const wash = new THREE.Mesh(geometry, material);
-    wash.name = 'Baoshi_Trail_Light_Pools';
+    wash.name = 'Baoshi_Woodland_Light_Pools';
     return wash;
   }
 
